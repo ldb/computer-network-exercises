@@ -21,11 +21,11 @@ struct element *createElement(char *key, char *value, int keylen, int valuelen);
 
 struct element *get(char *key, int keylen);
 
-void del(char *key, int keylen);
+int del(char *key, int keylen);
 
 void setElement(struct element *e);
 
-void set(char *key, char *value, int keylen, int valuelen);
+int set(char *key, char *value, int keylen, int valuelen);
 
 void init(int tablesize);
 
