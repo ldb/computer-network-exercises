@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <time.h>
-#include "hashtable.h"
+#include "rpc_interface.h"
 
 
 // check if a given array contains the searched value
@@ -76,7 +76,7 @@ void getFileInfo(char *file, char **data, char **keys, char **values){
 }
 
 
-// Perform 25 sets, gets and deletes
+// Perform 25 sets, gets and deletes and then try to get these elements again
 // (Has to get the Host and Port when communicating with the server)
 void setGetDel(char **keys, char**values, char *dns, char *port){
 	for(int i = 0; i < 25; i++){
@@ -87,11 +87,26 @@ void setGetDel(char **keys, char**values, char *dns, char *port){
 
 	for(int i = 0; i < 25; i++){
 		e = get(keys[i], strlen(keys[i]));
-		printf("keys[%d]: %s\nvalues[%d]: %s\n", i, e->key, i, e->value);
+		if(e != NULL){
+			printf("keys[%d]: %s\nvalues[%d]: %s\n", i, e->key, i, e->value);
+		}
+		else{
+			fprintf(stderr, "Couldn't find the element with the key: %s\n", keys[i]);
+		}
 	}
 
 	for(int i = 0; i < 25; i++){
 		del(keys[i], strlen(keys[i]));
+	}
+
+	for(int i = 0; i < 25; i++){
+		e = get(keys[i], strlen(keys[i]));
+		if(e != NULL){
+			printf("keys[%d]: %s\nvalues[%d]: %s\n", i, e->key, i, e->value);
+		}
+		else{
+			fprintf(stderr, "Couldn't find the element with the key: %s\n", keys[i]);
+		}
 	}
 }
 
@@ -113,7 +128,7 @@ int main(int argc, char *argv[]){
 
 	getFileInfo(argv[3], data, keys, values);
 
-	init(100);		// Initialize Hash Table (has to be removed when communicatin with the server)
+	init(argv[1], argv[2]);		// Initialize Socket in the rpc_interface
 
 	setGetDel(keys, values, argv[1], argv[2]);
 
@@ -123,7 +138,7 @@ int main(int argc, char *argv[]){
 		free(values[i]);
 	}
 
-	cleanup();			// Free the hashtable(remove)
+	cleanup();			// Free all allocated memory in the rpc_interface
 	free(data);			// Free all double pointer
 	free(keys);
 	free(values);
