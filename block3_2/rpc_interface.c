@@ -175,6 +175,8 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 		element->keylen = incoming_header.key_length;
 		element->valuelen = incoming_header.value_length;
 	}
+
+	element = NULL;
 	
 	return 0;
 }
