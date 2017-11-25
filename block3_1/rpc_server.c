@@ -52,6 +52,16 @@ void marshal(char *out_header, header_t *in_header) {
 	out_header[5] = (unsigned char)(in_header->value_length % 256);
 }
 
+void printHeader(header_t *header) {
+	printf("set: %d\n", header->set);
+	printf("get: %d\n", header->get);
+	printf("del: %d\n", header->del);
+	printf("ack: %d\n", header->ack);
+	printf("tid: %d\n", header->tid);
+	printf("k_l: %d\n", header->key_length);
+	printf("v_l: %d\n", header->value_length);
+}
+
 int main(int argc, char *argv[]) {
 	if (argc != 2) {
 		fprintf(stderr, "arguments: port\n");
@@ -110,7 +120,7 @@ int main(int argc, char *argv[]) {
 
 		ssize_t rs = 0;
 		ssize_t read = 0;
-		int once = 0;
+		int twice = 0;
 
 		header_t incoming_header;
 		char *key_buffer = NULL;
@@ -122,8 +132,8 @@ int main(int argc, char *argv[]) {
 			}
 			read += rs;
 
-			if (once == 0) {
-				once++;
+			if (twice == 0) {
+				twice++;
 				unmarshal(&incoming_header, request_ptr);
 
 				read_size = incoming_header.key_length;
@@ -133,7 +143,8 @@ int main(int argc, char *argv[]) {
 				continue;
 			}
 
-			if (read == incoming_header.key_length && incoming_header.value_length > 0) {
+			if (read == incoming_header.key_length && incoming_header.value_length > 0 && twice == 1) {
+				twice++;
 				request_ptr = value_buffer = malloc(incoming_header.value_length);
 				read_size = incoming_header.value_length;
 				read = 0;
