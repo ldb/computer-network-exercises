@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
 		socklen_t addr_size = sizeof incoming_addr;
 		temp_socket = accept(sockfd, (struct sockaddr *)&incoming_addr, &addr_size);
 
-		printf("[accept] New Connection!\n");
+		printf("[acpt] New Connection!\n");
 		// Declare Buffer for incoming request, header only
 		unsigned char request_header[6];
 		char *request_ptr = (char*)request_header;
@@ -112,8 +112,6 @@ int main(int argc, char *argv[]) {
 		ssize_t rs = 0;
 		ssize_t read = 0;
 		int twice = 0;
-
-		int total_size = 0;
 
 		header_t incoming_header;
 		memset(&incoming_header, 0, sizeof(header_t));
@@ -133,17 +131,8 @@ int main(int argc, char *argv[]) {
 				unmarshal(&incoming_header, &request_header[0]);
 				read_size = incoming_header.key_length;
 				request_ptr = key_buffer = malloc(read_size);
-				total_size = HEADER_SIZE + incoming_header.key_length + incoming_header.value_length;
 				read = 0;
 				continue;
-			}
-
-			if (twice == 1) {
-				printf("[recv] Received %zd / %u Key Bytes\n", rs, total_size);
-			}
-			
-			if (twice == 2) {
-				printf("[recv] Received %zd / %u Value Bytes\n", rs, total_size);
 			}
 
 			if (read == incoming_header.key_length && incoming_header.value_length > 0 && twice == 1) {
