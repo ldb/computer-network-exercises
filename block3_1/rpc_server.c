@@ -69,7 +69,6 @@ int main(int argc, char *argv[]) {
 	hints.ai_socktype = SOCK_STREAM; // Streaming socket protocol
 	hints.ai_flags = AI_PASSIVE; // Use default local adress
 
-	// Get adress info for our host
 	if ((status = getaddrinfo(NULL, argv[1], &hints, &res)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
 		return 2;
@@ -77,19 +76,16 @@ int main(int argc, char *argv[]) {
 
 	int sockfd;
 
-	// Create socket
 	if ((sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1) {
 		fprintf(stderr, "socket: %s\n", strerror(errno));
 		return 2;
 	}
 
-	// Bind to socket using our own adress
 	if ((bind(sockfd, res->ai_addr, res->ai_addrlen)) != 0) {
 		fprintf(stderr, "bind: %s\n", strerror(errno));
 		return 2;
 	}
 
-	// Set connection queue size to 1 as we only want one connection at a time
 	if ((listen(sockfd, 1)) == -1) {
 		fprintf(stderr, "listen: %s\n", strerror(errno));
 		return 2;
@@ -101,9 +97,8 @@ int main(int argc, char *argv[]) {
 		socklen_t addr_size = sizeof incoming_addr;
 		temp_socket = accept(sockfd, (struct sockaddr *)&incoming_addr, &addr_size);
 
-		printf("[acpt] New Connection!\n");
-		// Declare Buffer for incoming request, header only
-		unsigned char request_header[6];
+		printf("[acpt] New Connection\n");
+		unsigned char request_header[HEADER_SIZE];
 		char *request_ptr = (char*)request_header;
 		memset(&request_header, 0, sizeof request_header);
 
@@ -118,7 +113,7 @@ int main(int argc, char *argv[]) {
 
 		char *key_buffer = NULL;
 		char *value_buffer = NULL;
-		printf("[recv] Receiving Data!\n");
+		printf("[recv] Receiving Data\n");
 		do {
 			if ((rs = recv(temp_socket, request_ptr, read_size, 0)) < 0) {
 				fprintf(stderr, "recv: %s\n", strerror(errno));
@@ -150,13 +145,13 @@ int main(int argc, char *argv[]) {
 		memset(&outgoing_header, 0, sizeof outgoing_header);
 
 		if (incoming_header.set) {
-			printf("[recv] Received SET Command!\n");
+			printf("[recv] Received SET Command\n");
 			outgoing_header.set = set(key_buffer, value_buffer, incoming_header.key_length, incoming_header.value_length);
 			outgoing_header.key_length = outgoing_header.value_length = 0;
 		}
 
 		if (incoming_header.get) {
-			printf("[recv] Received GET Command!\n");
+			printf("[recv] Received GET Command\n");
 			struct element *e;
 			if ((e = get(key_buffer, incoming_header.key_length)) != NULL) {
 				value_buffer = malloc(e->valuelen);
@@ -168,7 +163,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (incoming_header.del) {
-			printf("[recv] Received DEL Command!\n");
+			printf("[recv] Received DEL Command\n");
 			outgoing_header.del = del(key_buffer, incoming_header.key_length);
 			outgoing_header.key_length = outgoing_header.value_length = 0;
 		}
@@ -196,9 +191,11 @@ int main(int argc, char *argv[]) {
 		} while (to_send > 0);
 		outbuffer -= final_size;
 
-		printf("[send] Sent %zu bytes!\n", final_size);
+		printf("[send] Sent %zu bytes\n", final_size);
 
 		close(temp_socket);
+
+		printf("[send] Closed connection\n");
 
 		free(key_buffer);
 		free(value_buffer);

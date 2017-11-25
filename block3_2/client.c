@@ -90,7 +90,7 @@ void setGetDel(char **keys, char**values, char *dns, char *port){
 		e = get(keys[i], strlen(keys[i]));
 
 		if(e != NULL){
-char *newKey = malloc(e->keylen+1);
+			char *newKey = malloc(e->keylen+1);
 			memcpy(newKey, e->key, e->keylen);
 			newKey[e->keylen] = '\0';
 			char *newValue = malloc(e->valuelen+1);
