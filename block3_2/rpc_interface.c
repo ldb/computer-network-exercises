@@ -49,10 +49,10 @@ void unmarshal(header_t *out_header, char *in_header) {
 }
 
 void marshal(char *out_header, header_t *in_header) {
-	out_header[0] += (unsigned char)in_header->set * CMD_SET;
-	out_header[0] += (unsigned char)in_header->del * CMD_DEL;
-	out_header[0] += (unsigned char)in_header->get * CMD_GET;
-	out_header[0] += (unsigned char)in_header->ack * CMD_ACK;
+	out_header[0] += (unsigned char)(in_header->set * CMD_SET);
+	out_header[0] += (unsigned char)(in_header->del * CMD_DEL);
+	out_header[0] += (unsigned char)(in_header->get * CMD_GET);
+	out_header[0] += (unsigned char)(in_header->ack * CMD_ACK);
 	out_header[1] = (unsigned char)in_header->tid;
 	out_header[2] = (unsigned char)(in_header->key_length >> 8);
 	out_header[3] = (unsigned char)(in_header->key_length % 256);
@@ -68,6 +68,13 @@ void printHeader(header_t *header) {
 	printf("tid: %d\n", header->tid);
 	printf("k_l: %d\n", header->key_length);
 	printf("v_l: %d\n", header->value_length);
+}
+
+void printElement(element_t *e) {
+	printf("k_l: %d\n", e->keylen);
+	printf("v_l: %d\n", e->valuelen);
+	printf("key: %s\n", e->key);
+	printf("val: %s\n", e->value);
 }
 
 void printBinary(char *binaryChar, int len) {
@@ -99,6 +106,10 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 		return 2;
 	}
 
+	printf("[do_rpc] Socket connected!\n");
+
+	//printBinary(out_buffer, 6);
+
 	int to_send = size;
 	do {
 		int sent;
@@ -107,14 +118,17 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 			return 2;
 		}
 
-		printf("sent: %d\n", sent);
+		printf("[send] Sent %d bytes\n", sent);
 
 		to_send -= sent;
 		out_buffer += sent;
 	} while (0 < to_send);
 	out_buffer -= size;
 
-	printf("done sending:\n");
+	printBinary(out_buffer, 6);
+
+	free(out_buffer);
+	printf("[do_rpc] freed outbuffer!\n");
 	
 	char request_header[HEADER_SIZE];
 	char *request_ptr = request_header;
@@ -129,21 +143,17 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 	header_t incoming_header;
 	char *key_buffer = NULL;
 	char *value_buffer = NULL;
-	printf("recving:\n");
 	do {
 		if ((rs = recv(sockfd, request_ptr, read_size, 0)) < 0) {
 			fprintf(stderr, "recv: %s\n", strerror(errno));
 			return 2;
 		}
 		read += rs;
-
-		printf("recv:\n");
+		printf("[recv] Received %zd bytes\n", rs);
 
 		if (twice == 0) {
 			twice++;
 			unmarshal(&incoming_header, request_ptr);
-
-			printHeader(&incoming_header);
 
 			read_size = incoming_header.key_length;
 			request_ptr = key_buffer = malloc(read_size);
@@ -163,32 +173,34 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 		request_ptr += rs;
 	} while (rs > 0 && read < read_size);
 
-	printf("done recving:\n");
-
 	close(sockfd);
+	printf("[do_rpc] Socket closed!\n");
+	//printHeader(&incoming_header);
 
 	if (incoming_header.get == 1) {
-		printBinary(key_buffer, incoming_header.key_length);
-		printBinary(value_buffer, incoming_header.value_length);
+		//printBinary(key_buffer, incoming_header.key_length);
+		//printBinary(value_buffer, incoming_header.value_length);
 		element->key = key_buffer;
 		element->value = value_buffer;
 		element->keylen = incoming_header.key_length;
 		element->valuelen = incoming_header.value_length;
+
+		//printElement(element);
 	}
 
-	element = NULL;
-	
 	return 0;
 }
 
 int set(char *key, char *value, int keylen, int valuelen) {
+	//printf("SET:\n %s,\n %d,\n %s,\n %d\n", key, keylen, value, valuelen);
+
 	header_t outgoing_header;
 	memset(&outgoing_header, 0, sizeof outgoing_header);
 	outgoing_header.set = 1;
 	outgoing_header.key_length = keylen;
 	outgoing_header.value_length = valuelen;
 
-	char h[6] = "00000";
+	char h[6] = "000000";
 	char *out_header = h;
 	marshal(out_header, &outgoing_header);
 
@@ -198,17 +210,17 @@ int set(char *key, char *value, int keylen, int valuelen) {
 	memcpy(outbuffer + HEADER_SIZE, key, outgoing_header.key_length);
 	memcpy(outbuffer + HEADER_SIZE + outgoing_header.key_length, value, outgoing_header.value_length);
 
-	printBinary(outbuffer, final_size);
+	element_t *e = malloc(sizeof(element_t));
+	memset(e, 0, sizeof(element_t));
+	printf("[set] Making Call!\n");
+	do_rpc(outbuffer, final_size, e);
 
-	element_t *e;
-	int res = do_rpc(outbuffer, final_size, e);
-
-	printf("returned: %d\n", res);
-	free(outbuffer);
 	return 0;
 }
 
 int del(char *key, int keylen) {
+	//printf("DEL:\n %s,\n %d\n", key, keylen);
+
 	header_t outgoing_header;
 	memset(&outgoing_header, 0, sizeof outgoing_header);
 	outgoing_header.del = 1;
@@ -225,16 +237,19 @@ int del(char *key, int keylen) {
 	memcpy(outbuffer, out_header, HEADER_SIZE);
 	memcpy(outbuffer + HEADER_SIZE, key, outgoing_header.key_length);
 	
-	printBinary(outbuffer, final_size);
+	//printBinary(outbuffer, final_size);
 
-	element_t *e;
-	int res = do_rpc(outbuffer, final_size, e);
+	element_t *e = malloc(sizeof(element_t));
+	memset(e, 0, sizeof(element_t));
+	printf("[del] Making Call!\n");
+	do_rpc(outbuffer, final_size, e);
 
-	free(outbuffer);
 	return 0;
 }
 
 struct element *get(char *key, int keylen) {
+	//printf("GET:\n %s,\n %d\n", key, keylen);
+
 	header_t outgoing_header;
 	memset(&outgoing_header, 0, sizeof outgoing_header);
 	outgoing_header.get = 1;
@@ -249,41 +264,17 @@ struct element *get(char *key, int keylen) {
 	memcpy(outbuffer, out_header, HEADER_SIZE);
 	memcpy(outbuffer + HEADER_SIZE, key, outgoing_header.key_length);
 
-	printBinary(outbuffer, final_size);
+	//printBinary(outbuffer, final_size);
 
 	element_t *e = malloc(sizeof(element_t));
+	memset(e, 0, sizeof(element_t));
+	printf("[get] Making Call!\n");
+	do_rpc(outbuffer, final_size, e);
 
-	int res = do_rpc(outbuffer, final_size, e);
-
-	free(outbuffer);
 	return e;
 }
 
 void init(char *host, char *port) {
 	HOST = host;
 	PORT = port;
-}
-
-int main(int argc, char *argv[]) {
-
-	init("localhost", "1717");
-
-	char *testkey1 = "key1";
-	char *testval1 = "val1";
-
-	set(testkey1, testval1, 4, 4);
-
-	char *testkey2 = "key1";
-	char *testval2 = "val2";
-
-	element_t *e = get(testkey1, 4);
-	printf("%s, %s\n",e->key, e->value);
-
-	char *testkey3 = "key3";
-	char *testval3 = "val3";
-
-	//del(testkey1, 4);
-
-	char *testkey4 = "key4";
-	char *testval4 = "val4";
 }

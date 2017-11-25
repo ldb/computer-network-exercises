@@ -6,6 +6,7 @@
 #include <time.h>
 #include "rpc_interface.h"
 
+#define COUNT 25
 
 // check if a given array contains the searched value
 int arrayContains(int *rnmbrs, int length, int number){
@@ -18,13 +19,13 @@ int arrayContains(int *rnmbrs, int length, int number){
 	return 0;
 }
 
-// get 25 random lines from a given file
+// get COUNT random lines from a given file
 // the key is the first string until the first ; occurs
 // the information is stored combined
 void getFileInfo(char *file, char **data, char **keys, char **values){
 	FILE *fp = fopen(file, "r");
 	int lines = 1;
-	int rnmbrs[25];
+	int rnmbrs[COUNT];
 	int number = 0;
 	srand(time(NULL));
 	char ch;
@@ -39,10 +40,10 @@ void getFileInfo(char *file, char **data, char **keys, char **values){
 	  	}
 	}
 
-	// create 25 random and different numbers
+	// create COUNT random and different numbers
 	// in range of the lines
 	int i = 0;
-	while(i < 25){
+	while(i < COUNT){
 		number = rand() % lines;
 		if(arrayContains(rnmbrs, lines, number) == 0){
 			rnmbrs[i] = number;
@@ -56,7 +57,7 @@ void getFileInfo(char *file, char **data, char **keys, char **values){
 	rewind(fp);
 	ch = ' ';
 
-	for(int i = 0; i < 25; i++){
+	for(int i = 0; i < COUNT; i++){
 		int j = 1;
 
 		while(j < rnmbrs[i]){
@@ -75,52 +76,51 @@ void getFileInfo(char *file, char **data, char **keys, char **values){
 	return;
 }
 
-
-// Perform 25 sets, gets and deletes and then try to get these elements again
+// Perform COUNT sets, gets and deletes and then try to get these elements again
 // (Has to get the Host and Port when communicating with the server)
 void setGetDel(char **keys, char**values, char *dns, char *port){
-	for(int i = 0; i < 25; i++){
+	for(int i = 0; i < COUNT; i++){
 		set(keys[i], values[i], strlen(keys[i]), strlen(values[i]));
 	}
 
 	struct element *e;
 
-	for(int i = 0; i < 25; i++){
+	for(int i = 0; i < COUNT; i++){
 		e = get(keys[i], strlen(keys[i]));
 		if(e != NULL){
-			printf("keys[%d]: %s\nvalues[%d]: %s\n", i, e->key, i, e->value);
+			//printf("keys[%d]: %s\nvalues[%d]: %s\n", i, e->key, i, e->value);
 		}
 		else{
-			fprintf(stderr, "Couldn't find the element with the key: %s\n", keys[i]);
+			//fprintf(stderr, "Couldn't find the element with the key: %s\n", keys[i]);
 		}
 	}
 
-	for(int i = 0; i < 25; i++){
+	for(int i = 0; i < COUNT; i++){
 		del(keys[i], strlen(keys[i]));
 	}
 
-	for(int i = 0; i < 25; i++){
+	for(int i = 0; i < COUNT; i++){
 		e = get(keys[i], strlen(keys[i]));
 		if(e != NULL){
-			printf("keys[%d]: %s\nvalues[%d]: %s\n", i, e->key, i, e->value);
+			//printf("keys[%d]: %s\nvalues[%d]: %s\n", i, e->key, i, e->value);
 		}
 		else{
-			fprintf(stderr, "Couldn't find the element with the key: %s\n", keys[i]);
+			//fprintf(stderr, "Couldn't find the element with the key: %s\n", keys[i]);
 		}
 	}
 }
 
 int main(int argc, char *argv[]){
 	if(argc != 4){
-		fprintf(stderr, "Use: ./client HOST PORT FILE");
+		//fprintf(stderr, "Use: ./client HOST PORT FILE");
 		return 0;
 	}
 
-	char **data = malloc(sizeof(char*)*25);			// saves all the readed data
-	char **keys = malloc(sizeof(char*)*25);			// saves all keys
-	char **values = malloc(sizeof(char*)*25);		// saves all values
+	char **data = malloc(sizeof(char*)*COUNT);			// saves all the readed data
+	char **keys = malloc(sizeof(char*)*COUNT);			// saves all keys
+	char **values = malloc(sizeof(char*)*COUNT);		// saves all values
 
-	for(int i = 0; i < 25; i++){
+	for(int i = 0; i < COUNT; i++){
 		data[i] = malloc(sizeof(char)*1024);		// saves a line from the file
 		keys[i] = malloc(sizeof(char)*128);			// saves the title of a movie
 		values[i] = malloc(sizeof(char)*996);		// saves more information about the movie
@@ -132,16 +132,16 @@ int main(int argc, char *argv[]){
 
 	setGetDel(keys, values, argv[1], argv[2]);
 
-	for(int i = 24; i >= 0; i--){	// Free all the allocated space
-		free(data[i]);
-		free(keys[i]);
-		free(values[i]);
+	for(int i = 0; i < COUNT; i--){	// Free all the allocated space
+		//free(data[i]);
+		//free(keys[i]);
+		//free(values[i]);
 	}
 
-	cleanup();			// Free all allocated memory in the rpc_interface
-	free(data);			// Free all double pointer
-	free(keys);
-	free(values);
+	//cleanup();			// Free all allocated memory in the rpc_interface
+	//free(data);			// Free all double pointer
+	//free(keys);
+	//free(values);
 
 	return 0;
 }
