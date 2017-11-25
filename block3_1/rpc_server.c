@@ -28,7 +28,7 @@ typedef struct header {
 	unsigned short value_length;
 } header_t;
 
-void unmarshal(header_t *out_header, char *in_header) {
+void unmarshal(header_t *out_header, unsigned char *in_header) {
 	out_header->set = (int)(in_header[0] & CMD_SET) == CMD_SET;
 	out_header->del = (int)(in_header[0] & CMD_DEL) == CMD_DEL;
 	out_header->get = (int)(in_header[0] & CMD_GET) == CMD_GET;
@@ -41,8 +41,8 @@ void unmarshal(header_t *out_header, char *in_header) {
 }
 
 void marshal(char *out_header, header_t *in_header) {
-	out_header[0] += (unsigned char)in_header->set * CMD_SET;
-	out_header[0] += (unsigned char)in_header->del * CMD_DEL;
+	out_header[0] += (unsigned char)(in_header->set * CMD_SET);
+	out_header[0] += (unsigned char)(in_header->del * CMD_DEL);
 	out_header[0] += (unsigned char)in_header->get * CMD_GET;
 	out_header[0] += (unsigned char)in_header->ack * CMD_ACK;
 	out_header[1] = (unsigned char)in_header->tid;
@@ -50,16 +50,6 @@ void marshal(char *out_header, header_t *in_header) {
 	out_header[3] = (unsigned char)(in_header->key_length % 256);
 	out_header[4] = (unsigned char)(in_header->value_length >> 8);
 	out_header[5] = (unsigned char)(in_header->value_length % 256);
-}
-
-void printHeader(header_t *header) {
-	printf("set: %d\n", header->set);
-	printf("get: %d\n", header->get);
-	printf("del: %d\n", header->del);
-	printf("ack: %d\n", header->ack);
-	printf("tid: %d\n", header->tid);
-	printf("k_l: %d\n", header->key_length);
-	printf("v_l: %d\n", header->value_length);
 }
 
 int main(int argc, char *argv[]) {
@@ -111,9 +101,10 @@ int main(int argc, char *argv[]) {
 		socklen_t addr_size = sizeof incoming_addr;
 		temp_socket = accept(sockfd, (struct sockaddr *)&incoming_addr, &addr_size);
 
+		printf("[accept] New Connection!\n");
 		// Declare Buffer for incoming request, header only
-		char request_header[6];
-		char *request_ptr = request_header;
+		unsigned char request_header[6];
+		char *request_ptr = (char*)request_header;
 		memset(&request_header, 0, sizeof request_header);
 
 		int read_size = sizeof request_header;
@@ -122,9 +113,14 @@ int main(int argc, char *argv[]) {
 		ssize_t read = 0;
 		int twice = 0;
 
+		int total_size = 0;
+
 		header_t incoming_header;
+		memset(&incoming_header, 0, sizeof(header_t));
+
 		char *key_buffer = NULL;
 		char *value_buffer = NULL;
+		printf("[recv] Receiving Data!\n");
 		do {
 			if ((rs = recv(temp_socket, request_ptr, read_size, 0)) < 0) {
 				fprintf(stderr, "recv: %s\n", strerror(errno));
@@ -134,13 +130,20 @@ int main(int argc, char *argv[]) {
 
 			if (twice == 0) {
 				twice++;
-				unmarshal(&incoming_header, request_ptr);
-
+				unmarshal(&incoming_header, &request_header[0]);
 				read_size = incoming_header.key_length;
 				request_ptr = key_buffer = malloc(read_size);
-
+				total_size = HEADER_SIZE + incoming_header.key_length + incoming_header.value_length;
 				read = 0;
 				continue;
+			}
+
+			if (twice == 1) {
+				printf("[recv] Received %zd / %u Key Bytes\n", rs, total_size);
+			}
+			
+			if (twice == 2) {
+				printf("[recv] Received %zd / %u Value Bytes\n", rs, total_size);
 			}
 
 			if (read == incoming_header.key_length && incoming_header.value_length > 0 && twice == 1) {
@@ -158,11 +161,13 @@ int main(int argc, char *argv[]) {
 		memset(&outgoing_header, 0, sizeof outgoing_header);
 
 		if (incoming_header.set) {
+			printf("[recv] Received SET Command!\n");
 			outgoing_header.set = set(key_buffer, value_buffer, incoming_header.key_length, incoming_header.value_length);
 			outgoing_header.key_length = outgoing_header.value_length = 0;
 		}
 
 		if (incoming_header.get) {
+			printf("[recv] Received GET Command!\n");
 			struct element *e;
 			if ((e = get(key_buffer, incoming_header.key_length)) != NULL) {
 				value_buffer = malloc(e->valuelen);
@@ -174,6 +179,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (incoming_header.del) {
+			printf("[recv] Received DEL Command!\n");
 			outgoing_header.del = del(key_buffer, incoming_header.key_length);
 			outgoing_header.key_length = outgoing_header.value_length = 0;
 		}
@@ -200,6 +206,8 @@ int main(int argc, char *argv[]) {
 			outbuffer += sent;
 		} while (to_send > 0);
 		outbuffer -= final_size;
+
+		printf("[send] Sent %zu bytes!\n", final_size);
 
 		close(temp_socket);
 
