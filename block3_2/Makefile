@@ -1,5 +1,5 @@
 BIN = client
-ABIN = hashtable.c
+ABIN = rpc_interface.c
 HOST = localhost
 PORT = 8080
 FILE = filme.csv

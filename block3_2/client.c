@@ -80,15 +80,23 @@ void getFileInfo(char *file, char **data, char **keys, char **values){
 // (Has to get the Host and Port when communicating with the server)
 void setGetDel(char **keys, char**values, char *dns, char *port){
 	for(int i = 0; i < COUNT; i++){
-		set(keys[i], values[i], strlen(keys[i]), strlen(values[i]));
+		int res = set(keys[i], values[i], strlen(keys[i]), strlen(values[i]));
+		printf("send: %d\nres: %d\n", i+1, res);
 	}
 
 	struct element *e;
 
 	for(int i = 0; i < COUNT; i++){
 		e = get(keys[i], strlen(keys[i]));
+
 		if(e != NULL){
-			//printf("keys[%d]: %s\nvalues[%d]: %s\n", i, e->key, i, e->value);
+char *newKey = malloc(e->keylen+1);
+			memcpy(newKey, e->key, e->keylen);
+			newKey[e->keylen] = '\0';
+			char *newValue = malloc(e->valuelen+1);
+			memcpy(newValue, e->value, e->valuelen);
+			newValue[e->valuelen] = '\0';
+			printf("keys[%d]: %s\nvalues[%d]: %s\n", i, newKey, i, newValue);
 		}
 		else{
 			//fprintf(stderr, "Couldn't find the element with the key: %s\n", keys[i]);
@@ -101,8 +109,15 @@ void setGetDel(char **keys, char**values, char *dns, char *port){
 
 	for(int i = 0; i < COUNT; i++){
 		e = get(keys[i], strlen(keys[i]));
+
 		if(e != NULL){
-			//printf("keys[%d]: %s\nvalues[%d]: %s\n", i, e->key, i, e->value);
+      char *newKey = malloc(e->keylen+1);
+			memcpy(newKey, e->key, e->keylen);
+			newKey[e->keylen] = '\0';
+			char *newValue = malloc(e->valuelen+1);
+			memcpy(newValue, e->value, e->valuelen);
+			newValue[e->valuelen] = '\0';
+			printf("keys[%d]: %s\nvalues[%d]: %s\n", i, newKey, i, newValue);
 		}
 		else{
 			//fprintf(stderr, "Couldn't find the element with the key: %s\n", keys[i]);
@@ -132,16 +147,14 @@ int main(int argc, char *argv[]){
 
 	setGetDel(keys, values, argv[1], argv[2]);
 
-	for(int i = 0; i < COUNT; i--){	// Free all the allocated space
-		//free(data[i]);
-		//free(keys[i]);
-		//free(values[i]);
+  for(int i = 0; i < COUNT; i++){	// Free all the allocated space
+		free(data[i]);
+		free(keys[i]);
+		free(values[i]);
 	}
 
-	//cleanup();			// Free all allocated memory in the rpc_interface
-	//free(data);			// Free all double pointer
-	//free(keys);
-	//free(values);
-
+	free(data);			// Free all double pointer
+	free(keys);
+	free(values);
 	return 0;
 }
