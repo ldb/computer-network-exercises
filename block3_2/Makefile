@@ -1,43 +1,51 @@
-BIN = client
+BIN = clients
+SBIN = servers
 ABIN = rpc_interface.c
+BBIN = hashtable.c
 HOST = localhost
 PORT = 8080
 FILE = filme.csv
 
 SRC = \
-	client.c	
+	client.c
+SRC2 = \
+	rpc_server.c
 
 ARCH = $(shell getconf LONG_BIT)
 
 
 CC	 = gcc
-CFLAGS   = -g -Wall $(SDL_CFLAGS_$(ARCH))
+CFLAGS   = -g $(SDL_CFLAGS_$(ARCH))
 LFLAGS   += $(SDL_LFLAGS_$(ARCH))
 
 
 GDB    = gdb
 RM     = rm -f
 
-OBJS = $(SRC:%.c=%.o)
+OBJC = $(SRC:%.c=%.o)
+OBJS = $(SRC2:%.c=%.o)
 
-$(BIN): $(OBJS)
-	$(CC) $(CFLAGS) -o $(BIN) $(ABIN) $(OBJS) $(LFLAGS)
+$(BIN): $(OBJC)
+	$(CC) $(CFLAGS) -o $(BIN) $(ABIN) $(OBJC) $(LFLAGS)
 
-# pull in dependencies for .o files
+$(SBIN): $(OBJS)
+	$(CC) $(CFLAGS) -o $(SBIN) $(BBIN) $(OBJS) $(LFLAGS)
+
+# pull in dependencies for .o files	
+-include $(OBJC:.o=.d)
 -include $(OBJS:.o=.d)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
 	$(CC) -MM $(CFLAGS) $*.c > $*.d
 
-
-debug: $(BIN)
-	$(GDB) ./$(BIN)
-
-run: $(BIN)
+client: $(BIN)
 	./$(BIN) $(HOST) $(PORT) $(FILE)
 
+server: $(SBIN)
+	./$(SBIN) $(PORT)
+
 clean:
-	$(RM) $(BIN) $(OBJS) *.d $(OBIN)
+	$(RM) $(SBIN) $(BIN) $(OBJS) $(OBJC) *.d $(OBIN)
 
 .PHONY: clean debug run 
