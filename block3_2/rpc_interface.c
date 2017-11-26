@@ -80,8 +80,6 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 		return 2;
 	}
 
-	printf("[do_rpc] Socket connected!\n");
-
 	int to_send = size;
 	do {
 		int sent;
@@ -90,16 +88,14 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 			return 2;
 		}
 
-		printf("[send] Sent %d bytes\n", sent);
+		printf("[i] Sent %d bytes\n", sent);
 
 		to_send -= sent;
 		out_buffer += sent;
 	} while (0 < to_send);
 	out_buffer -= size;
 
-	free(out_buffer);
-	printf("[do_rpc] freed outbuffer!\n");
-	
+	free(out_buffer);	
 	unsigned char request_header[HEADER_SIZE];
 	char *request_ptr = (char*)request_header;
 	memset(&request_header, 0, HEADER_SIZE);
@@ -119,7 +115,7 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 			return 2;
 		}
 		read += rs;
-		printf("[recv] Received %zd bytes\n", rs);
+		printf("[i] Received %zd bytes\n", rs);
 
 		if (twice == 0) {
 			twice++;
@@ -142,7 +138,6 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 	} while (rs > 0 && read < read_size);
 
 	close(sockfd);
-	printf("[do_rpc] Socket closed\n");
 
 	if (incoming_header.get == 1) {
 		element->key = key_buffer;
@@ -171,9 +166,8 @@ int set(char *key, char *value, int keylen, int valuelen) {
 	memcpy(outbuffer + HEADER_SIZE, key, outgoing_header.key_length);
 	memcpy(outbuffer + HEADER_SIZE + outgoing_header.key_length, value, outgoing_header.value_length);
 
-	element_t *e;
-	printf("[set] Making Call\n");
-	return do_rpc(outbuffer, final_size, e);
+	printf("[i] SET\n");
+	return do_rpc(outbuffer, final_size, NULL);
 }
 
 int del(char *key, int keylen) {
@@ -187,15 +181,12 @@ int del(char *key, int keylen) {
 
 	marshal(out_header, &outgoing_header);
 	size_t final_size = outgoing_header.key_length + HEADER_SIZE;
-
 	char *outbuffer = malloc(final_size);
-
 	memcpy(outbuffer, out_header, HEADER_SIZE);
 	memcpy(outbuffer + HEADER_SIZE, key, outgoing_header.key_length);
 	
-	element_t *e;
-	printf("[del] Making Call\n");
-	return do_rpc(outbuffer, final_size, e);
+	printf("[i] DEL\n");
+	return do_rpc(outbuffer, final_size, NULL);
 }
 
 struct element *get(char *key, int keylen) {
@@ -209,15 +200,12 @@ struct element *get(char *key, int keylen) {
 	marshal(out_header, &outgoing_header);
 	size_t final_size = outgoing_header.key_length + HEADER_SIZE;
 	char *outbuffer = malloc(final_size);
-
 	memcpy(outbuffer, out_header, HEADER_SIZE);
 	memcpy(outbuffer + HEADER_SIZE, key, outgoing_header.key_length);
 
-	element_t *e = malloc(sizeof(element_t));
-	memset(e, 0, sizeof(element_t));
-	printf("[get] Making Call\n");
+	element_t *e;
+	printf("[i] GET\n");
 	do_rpc(outbuffer, final_size, e);
-
 	return e;
 }
 

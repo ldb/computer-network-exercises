@@ -17,4 +17,3 @@ int set(char *key, char *value, int keylen, int valuelen);
 void init(char *host, char *port);
 
 #endif
-
