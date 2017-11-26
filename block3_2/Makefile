@@ -1,5 +1,5 @@
-BIN = clients
-SBIN = servers
+BIN = rpc_client
+SBIN = rpc_server
 ABIN = rpc_interface.c
 BBIN = hashtable.c
 HOST = localhost
@@ -19,7 +19,6 @@ CFLAGS   = -g $(SDL_CFLAGS_$(ARCH))
 LFLAGS   += $(SDL_LFLAGS_$(ARCH))
 
 
-GDB    = gdb
 RM     = rm -f
 
 OBJC = $(SRC:%.c=%.o)
@@ -48,4 +47,4 @@ server: $(SBIN)
 clean:
 	$(RM) $(SBIN) $(BIN) $(OBJS) $(OBJC) *.d $(OBIN)
 
-.PHONY: clean debug run 
+.PHONY: clean
