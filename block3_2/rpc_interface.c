@@ -144,6 +144,7 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 		element->value = value_buffer;
 		element->keylen = incoming_header.key_length;
 		element->valuelen = incoming_header.value_length;
+		return 1;
 	}
 
 	return 0;
@@ -203,9 +204,14 @@ struct element *get(char *key, int keylen) {
 	memcpy(outbuffer, out_header, HEADER_SIZE);
 	memcpy(outbuffer + HEADER_SIZE, key, outgoing_header.key_length);
 
-	element_t *e;
+	element_t *e = malloc(sizeof(element_t));
 	printf("[i] GET\n");
-	do_rpc(outbuffer, final_size, e);
+
+	if((do_rpc(outbuffer, final_size, e)) != 1) {
+		free(e);
+		return NULL;
+	};
+
 	return e;
 }
 
