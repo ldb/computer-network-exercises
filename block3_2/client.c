@@ -86,7 +86,6 @@ void setGetDel(char **keys, char**values, char *dns, char *port) {
 
 	for (int i = 0; i < COUNT; i++) {
 		e = get(keys[i], strlen(keys[i]));
-		printf("%p", e);
 
 		if (e != NULL) {
 			char *newKey = malloc(e->keylen + 1);
