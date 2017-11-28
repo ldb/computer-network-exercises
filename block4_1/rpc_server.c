@@ -20,7 +20,6 @@
 #define HEADER_SIZE_EXT 6
 #define HEADER_SIZE_INL 14
 
-unsigned int BASE_PORT = 4000;
 unsigned int HASH_SPACE = 100; // Maximum number of nodes in the ring
 
 char *SELF_IP;
@@ -96,13 +95,31 @@ void marshal(char *out_header, header_t *in_header) {
     out_header[13] = (unsigned char) (in_header->port % 256);
 }
 
-int
-recv_all(header_t *incoming_header, int socket, unsigned char *request_header, char *key_buffer, char *value_buffer) {
+void printHeader(header_t *header) {
+    printf("set: %d\n", header->set);
+    printf("get: %d\n", header->get);
+    printf("del: %d\n", header->del);
+    printf("ack: %d\n", header->ack);
+    printf("tid: %d\n", header->tid);
+    printf("k_l: %d\n", header->k_l);
+    printf("v_l: %d\n", header->k_l);
+}
+
+void printBinary(char *binaryChar, int len) {
+    for (int j = 0; j < len; j++) {
+        for (int i = 0; i < 8; i++) {
+            printf("%d", !!((binaryChar[j] << i) & 0x80));
+        }
+        printf(" %c\n", binaryChar[j]);
+    }
+}
+
+int recv_all(header_t *incoming_header, int socket, unsigned char *request_header, char **key_buffer, char **value_buffer, int headersize) {
     char *request_ptr = (char *) request_header;
-    int read_size = sizeof request_header;
+    int read_size = headersize;
 
     ssize_t rs = 0;
-    ssize_t read = 0;
+    int read = 0;
     int twice = 0;
 
     do {
@@ -115,36 +132,40 @@ recv_all(header_t *incoming_header, int socket, unsigned char *request_header, c
         if (twice == 0) {
             twice++;
             unmarshal(incoming_header, &request_header[0]);
+            printHeader(incoming_header);
             read_size = incoming_header->k_l;
-            request_ptr = key_buffer = malloc(read_size);
+            printf("kl: %d\n", incoming_header->k_l);
+            request_ptr = *key_buffer = malloc(read_size);
             read = 0;
             continue;
         }
+        printf("rs: %zd\n", rs);
 
         if (read == incoming_header->k_l && incoming_header->v_l > 0 && twice == 1) {
             twice++;
-            request_ptr = value_buffer = malloc(incoming_header->v_l);
+            request_ptr = *value_buffer = malloc(incoming_header->v_l);
             read_size = incoming_header->v_l;
+            printf("vl: %d\n", incoming_header->v_l);
             read = 0;
             continue;
         }
 
         request_ptr += rs;
     } while (rs > 0 && read < read_size);
-
+    printf("done readong\n");
     return 0;
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        fprintf(stderr, "arguments: id, next id\n");
+    if (argc != 5) {
+        fprintf(stderr, "arguments: port, id, next port, next id\n");
         return 1;
     }
 
-    SELF_ID = argv[1];
-    NEXT_ID = argv[2];
-    *SELF_PORT = (char) ((int) BASE_PORT + (int) SELF_ID);
-    NEXT_PORT = BASE_PORT + NEXT_ID;
+    SELF_PORT = argv[1];
+    NEXT_PORT = argv[3];
+    SELF_ID = argv[2];
+    NEXT_ID = argv[4];
 
     struct addrinfo hints, *res;
     int status;
@@ -232,21 +253,25 @@ int main(int argc, char *argv[]) {
                 request_ptr += rs;
             } while (rs > 0 && read < read_size);*/
 
-        recv_all(incoming_header_ptr, temp_socket, &request_header[0], key_buffer, value_buffer);
+        recv_all(incoming_header_ptr, temp_socket, &request_header[0], &key_buffer, &value_buffer, sizeof request_header);
 
         header_t outgoing_header;
         memset(&outgoing_header, 0, sizeof outgoing_header);
 
-        int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
+        //int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
 
-        if (key_hash > (int) NEXT_ID) {
+        if (1 == 0){ //key_hash > (int) NEXT_ID) {
 
             // Forward to NEXT_ID instead
 
         } else {
             if (incoming_header.set) {
                 printf("[recv] Received SET Command\n");
-                outgoing_header.set = set(key_buffer, value_buffer, incoming_header.k_l, incoming_header.v_l);
+
+                printBinary(key_buffer, incoming_header.k_l);
+                printBinary(value_buffer, incoming_header.v_l);
+
+                outgoing_header.set = set(key_buffer, value_buffer, (int)incoming_header.k_l, (int)incoming_header.v_l);
                 outgoing_header.k_l = outgoing_header.v_l = 0;
             }
 
