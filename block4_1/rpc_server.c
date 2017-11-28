@@ -17,8 +17,18 @@
 #define CMD_ACK 8
 #define CMD_INL 128
 
-int HEADER_SIZE_EXT = 6;
-int HEADER_SIZE_INL = 14;
+unsigned int HEADER_SIZE_EXT = 6;
+unsigned int HEADER_SIZE_INL = 14;
+
+unsigned int BASE_PORT = 4000;
+unsigned int HASH_SPACE = 100; // Maximum number of nodes in the ring
+
+char *SELF_IP;
+char *NEXT_IP;
+char *SELF_PORT;
+char *NEXT_PORT;
+char *SELF_ID;
+char *NEXT_ID;
 
 typedef struct header {
     unsigned int set : 1;
@@ -88,9 +98,14 @@ void marshal(char *out_header, header_t *in_header) {
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        fprintf(stderr, "arguments: port id\n");
+        fprintf(stderr, "arguments: id, next id\n");
         return 1;
     }
+
+    SELF_ID = argv[1];
+    NEXT_ID = argv[2];
+    SELF_PORT = BASE_PORT + SELF_ID;
+    NEXT_PORT = BASE_PORT + NEXT_ID;
 
     struct addrinfo hints, *res;
     int status;
@@ -103,7 +118,7 @@ int main(int argc, char *argv[]) {
     hints.ai_socktype = SOCK_STREAM; // Streaming socket protocol
     hints.ai_flags = AI_PASSIVE; // Use default local adress
 
-    if ((status = getaddrinfo(NULL, argv[1], &hints, &res)) != 0) {
+    if ((status = getaddrinfo(NULL, SELF_PORT, &hints, &res)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
         return 2;
     }
@@ -127,12 +142,14 @@ int main(int argc, char *argv[]) {
 
     while (1) {
         int temp_socket;
+        int yes = 1;
+        setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
         struct sockaddr_storage incoming_addr;
         socklen_t addr_size = sizeof incoming_addr;
         temp_socket = accept(sockfd, (struct sockaddr *) &incoming_addr, &addr_size);
 
         printf("[acpt] New Connection\n");
-        unsigned char request_header[HEADER_SIZE_INL];
+        unsigned char request_header[HEADER_SIZE_EXT];
         char *request_ptr = (char *) request_header;
         memset(&request_header, 0, sizeof request_header);
 
@@ -178,44 +195,51 @@ int main(int argc, char *argv[]) {
         header_t outgoing_header;
         memset(&outgoing_header, 0, sizeof outgoing_header);
 
-        if (incoming_header.set) {
-            printf("[recv] Received SET Command\n");
-            outgoing_header.set = set(key_buffer, value_buffer, incoming_header.k_l,
-                                      incoming_header.v_l);
-            outgoing_header.k_l = outgoing_header.v_l = 0;
-        }
+        int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
 
-        if (incoming_header.get) {
-            printf("[recv] Received GET Command\n");
-            struct element *e;
-            if ((e = get(key_buffer, incoming_header.k_l)) != NULL) {
-                value_buffer = malloc(e->valuelen);
-                memcpy(value_buffer, e->value, (size_t) e->valuelen);
-                outgoing_header.v_l = e->valuelen;
-                outgoing_header.get = 1;
-                outgoing_header.k_l = e->keylen;
+        if (key_hash > (int) NEXT_ID) {
+
+            // Forward to NEXT_ID instead
+
+        } else {
+            if (incoming_header.set) {
+                printf("[recv] Received SET Command\n");
+                outgoing_header.set = set(key_buffer, value_buffer, incoming_header.k_l, incoming_header.v_l);
+                outgoing_header.k_l = outgoing_header.v_l = 0;
             }
-        }
 
-        if (incoming_header.del) {
-            printf("[recv] Received DEL Command\n");
-            outgoing_header.del = del(key_buffer, incoming_header.k_l);
-            outgoing_header.k_l = outgoing_header.v_l = 0;
-        }
+            if (incoming_header.get) {
+                printf("[recv] Received GET Command\n");
+                struct element *e;
+                if ((e = get(key_buffer, incoming_header.k_l)) != NULL) {
+                    value_buffer = malloc(e->valuelen);
+                    memcpy(value_buffer, e->value, (size_t) e->valuelen);
+                    outgoing_header.v_l = e->valuelen;
+                    outgoing_header.get = 1;
+                    outgoing_header.k_l = e->keylen;
+                }
+            }
 
-        outgoing_header.ack = 1;
-        outgoing_header.tid = incoming_header.tid;
+            if (incoming_header.del) {
+                printf("[recv] Received DEL Command\n");
+                outgoing_header.del = del(key_buffer, incoming_header.k_l);
+                outgoing_header.k_l = outgoing_header.v_l = 0;
+            }
+
+            outgoing_header.ack = 1;
+            outgoing_header.tid = incoming_header.tid;
+        }
 
         char h[6] = "000000";
         char *out_header = h;
         marshal(out_header, &outgoing_header);
 
-        size_t final_size = outgoing_header.k_l + outgoing_header.v_l + HEADER_SIZE_INL;
+        size_t final_size = outgoing_header.k_l + outgoing_header.v_l + HEADER_SIZE_EXT;
         char *outbuffer = malloc(final_size);
 
-        memcpy(outbuffer, out_header, HEADER_SIZE_INL);
-        memcpy(outbuffer + HEADER_SIZE_INL, key_buffer, outgoing_header.k_l);
-        memcpy(outbuffer + HEADER_SIZE_INL + outgoing_header.k_l, value_buffer, outgoing_header.v_l);
+        memcpy(outbuffer, out_header, HEADER_SIZE_EXT);
+        memcpy(outbuffer + HEADER_SIZE_EXT, key_buffer, outgoing_header.k_l);
+        memcpy(outbuffer + HEADER_SIZE_EXT + outgoing_header.k_l, value_buffer, outgoing_header.v_l);
 
         int to_send = final_size;
 
