@@ -17,8 +17,8 @@
 #define CMD_ACK 8
 #define CMD_INL 128
 
-unsigned int HEADER_SIZE_EXT = 6;
-unsigned int HEADER_SIZE_INL = 14;
+#define HEADER_SIZE_EXT 6
+#define HEADER_SIZE_INL 14
 
 unsigned int BASE_PORT = 4000;
 unsigned int HASH_SPACE = 100; // Maximum number of nodes in the ring
@@ -96,15 +96,54 @@ void marshal(char *out_header, header_t *in_header) {
     out_header[13] = (unsigned char) (in_header->port % 256);
 }
 
+int
+recv_all(header_t *incoming_header, int socket, unsigned char *request_header, char *key_buffer, char *value_buffer) {
+    char *request_ptr = (char *) request_header;
+    int read_size = sizeof request_header;
+
+    ssize_t rs = 0;
+    ssize_t read = 0;
+    int twice = 0;
+
+    do {
+        if ((rs = recv(socket, request_ptr, read_size, 0)) < 0) {
+            fprintf(stderr, "recv: %s\n", strerror(errno));
+            return 2;
+        }
+        read += rs;
+
+        if (twice == 0) {
+            twice++;
+            unmarshal(incoming_header, &request_header[0]);
+            read_size = incoming_header->k_l;
+            request_ptr = key_buffer = malloc(read_size);
+            read = 0;
+            continue;
+        }
+
+        if (read == incoming_header->k_l && incoming_header->v_l > 0 && twice == 1) {
+            twice++;
+            request_ptr = value_buffer = malloc(incoming_header->v_l);
+            read_size = incoming_header->v_l;
+            read = 0;
+            continue;
+        }
+
+        request_ptr += rs;
+    } while (rs > 0 && read < read_size);
+
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
+    if (argc != 3) {
         fprintf(stderr, "arguments: id, next id\n");
         return 1;
     }
 
     SELF_ID = argv[1];
     NEXT_ID = argv[2];
-    SELF_PORT = BASE_PORT + SELF_ID;
+    *SELF_PORT = (char) ((int) BASE_PORT + (int) SELF_ID);
     NEXT_PORT = BASE_PORT + NEXT_ID;
 
     struct addrinfo hints, *res;
@@ -150,47 +189,50 @@ int main(int argc, char *argv[]) {
 
         printf("[acpt] New Connection\n");
         unsigned char request_header[HEADER_SIZE_EXT];
-        char *request_ptr = (char *) request_header;
+        //   char *request_ptr = (char *) request_header;
         memset(&request_header, 0, sizeof request_header);
 
-        int read_size = sizeof request_header;
+        /*    int read_size = sizeof request_header;
 
-        ssize_t rs = 0;
-        ssize_t read = 0;
-        int twice = 0;
+            ssize_t rs = 0;
+            ssize_t read = 0;
+            int twice = 0;*/
 
         header_t incoming_header;
-        memset(&incoming_header, 0, sizeof(header_t));
+        header_t *incoming_header_ptr = &incoming_header;
+        memset(incoming_header_ptr, 0, sizeof(header_t));
 
         char *key_buffer = NULL;
         char *value_buffer = NULL;
         printf("[recv] Receiving Data\n");
-        do {
-            if ((rs = recv(temp_socket, request_ptr, read_size, 0)) < 0) {
-                fprintf(stderr, "recv: %s\n", strerror(errno));
-                return 2;
-            }
-            read += rs;
+        /*    do {
+                if ((rs = recv(temp_socket, request_ptr, read_size, 0)) < 0) {
+                    fprintf(stderr, "recv: %s\n", strerror(errno));
+                    return 2;
+                }
+                read += rs;
 
-            if (twice == 0) {
-                twice++;
-                unmarshal(&incoming_header, &request_header[0]);
-                read_size = incoming_header.k_l;
-                request_ptr = key_buffer = malloc(read_size);
-                read = 0;
-                continue;
-            }
+                if (twice == 0) {
+                    twice++;
+                    unmarshal(&incoming_header, &request_header[0]);
+                    read_size = incoming_header.k_l;
+                    request_ptr = key_buffer = malloc(read_size);
+                    read = 0;
+                    continue;
+                }
 
-            if (read == incoming_header.k_l && incoming_header.v_l > 0 && twice == 1) {
-                twice++;
-                request_ptr = value_buffer = malloc(incoming_header.v_l);
-                read_size = incoming_header.v_l;
-                read = 0;
-                continue;
-            }
+                if (read == incoming_header.k_l && incoming_header.v_l > 0 && twice == 1) {
+                    twice++;
+                    request_ptr = value_buffer = malloc(incoming_header.v_l);
+                    read_size = incoming_header.v_l;
+                    read = 0;
+                    continue;
+                }
 
-            request_ptr += rs;
-        } while (rs > 0 && read < read_size);
+                request_ptr += rs;
+            } while (rs > 0 && read < read_size);*/
+
+        recv_all(incoming_header_ptr, temp_socket, &request_header[0], key_buffer, value_buffer);
 
         header_t outgoing_header;
         memset(&outgoing_header, 0, sizeof outgoing_header);
@@ -230,7 +272,7 @@ int main(int argc, char *argv[]) {
             outgoing_header.tid = incoming_header.tid;
         }
 
-        char h[6] = "000000";
+        char h[HEADER_SIZE_EXT] = "000000";
         char *out_header = h;
         marshal(out_header, &outgoing_header);
 
