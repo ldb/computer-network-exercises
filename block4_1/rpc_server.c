@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
     int status;
 
     // Initialize Hashtagble of size 100
-    init(100);
+    //init(100);
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC; // Do not specify IPv4 or IPv6 explicitely
