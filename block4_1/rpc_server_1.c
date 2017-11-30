@@ -21,13 +21,17 @@
 #define HEADER_SIZE_INL 14
 
 unsigned int HASH_SPACE = 100; // Maximum number of nodes in the ring
+unsigned int SELF_HASH_SPACE = 25;
 
 char *SELF_IP;
 char *NEXT_IP;
+char *PREV_IP;
 char *SELF_PORT;
 char *NEXT_PORT;
+char *PREV_PORT;
 char *SELF_ID;
 char *NEXT_ID;
+char *PREV_ID;
 
 typedef struct header {
     unsigned int set : 1;
@@ -85,8 +89,8 @@ void marshal(char *out_header, header_t *in_header) {
     }
 
     out_header[0] += (unsigned char) (in_header->inl * CMD_INL);
-    out_header[6] = (unsigned char) (in_header->id >> 8);
-    out_header[7] = (unsigned char) (in_header->id % 256);
+    out_header[6] = (unsigned char) (in_header->id >> 8);   //die ersten 8 Stellen der ID als MSB, erste Hälfte ins erste Byte der ID
+    out_header[7] = (unsigned char) (in_header->id % 256);  //die letzten 8 Stellen der ID als LSB, zweite Hälfte ins zweite Byte der ID
     out_header[8] = (unsigned char) (in_header->ip >> 24);
     out_header[9] = (unsigned char) (in_header->ip >> 16);
     out_header[10] = (unsigned char) (in_header->ip >> 8);
@@ -161,21 +165,26 @@ int recv_all(header_t *incoming_header, int socket, unsigned char *request_heade
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 5) {
-        fprintf(stderr, "arguments: port, id, next port, next id\n");
+    if (argc != 7) {
+        fprintf(stderr, "arguments: port, id, previous port, previous id, next port, next id, ip-adress\n");
         return 1;
     }
 
     SELF_PORT = argv[1];
-    NEXT_PORT = argv[3];
+    NEXT_PORT = argv[5];
+    PREV_PORT = argv[3];
     SELF_ID = argv[2];
-    NEXT_ID = argv[4];
+    NEXT_ID = argv[6];
+    PREV_ID = argv[4];
+    SELF_IP = argv[7];
+    NEXT_IP = argv[7];
+    PREV_IP = argv[7];
 
     struct addrinfo hints, *res;
     int status;
 
-    // Initialize Hashtagble of size 100
-    //init(100);
+    // Initialize Hashtagble of size 25
+    init(SELF_HASH_SPACE);
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC; // Do not specify IPv4 or IPv6 explicitely
@@ -214,10 +223,10 @@ int main(int argc, char *argv[]) {
 
         printf("[acpt] New Connection\n");
         unsigned char request_header[HEADER_SIZE_EXT];
-        //   char *request_ptr = (char *) request_header;
+           //char *request_ptr = (char *) request_header;
         memset(&request_header, 0, sizeof request_header);
 
-        /*    int read_size = sizeof request_header;
+         /*   int read_size = sizeof request_header;
 
             ssize_t rs = 0;
             ssize_t read = 0;
@@ -230,7 +239,7 @@ int main(int argc, char *argv[]) {
         char *key_buffer = NULL;
         char *value_buffer = NULL;
         printf("[recv] Receiving Data\n");
-        /*    do {
+       /*     do {
                 if ((rs = recv(temp_socket, request_ptr, read_size, 0)) < 0) {
                     fprintf(stderr, "recv: %s\n", strerror(errno));
                     return 2;
@@ -262,11 +271,16 @@ int main(int argc, char *argv[]) {
         header_t outgoing_header;
         memset(&outgoing_header, 0, sizeof outgoing_header);
 
-        //int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
+        int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
 
-        if (1 == 0){ //key_hash > (int) NEXT_ID) {
+        if (key_hash >= (atoi(SELF_ID) - 1) + SELF_HASH_SPACE){
+            printf("Peer Number %d sent to next peer number %d\n", atoi(SELF_ID), atoi(NEXT_ID));
 
-            // Forward to NEXT_ID instead
+            outgoing_header.set = incoming_header.set;
+            outgoing_header.get = incoming_header.get;
+            outgoing_header.del = incoming_header.del;
+            outgoing_header.ack = 0;
+            outgoing_header.inl = 1;
 
         } else {
             if (incoming_header.set) {
