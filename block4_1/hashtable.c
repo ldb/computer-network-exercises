@@ -106,6 +106,7 @@ int del(char *key, int keylen) {
 void setElement(struct element *e) {
 	unsigned int hashValue = hash(e->key, e->keylen);
 
+	printf("is it maybe\n");
 	struct element *tmp = hashtable[hashValue].head;
 
 	if (tmp == NULL) {
@@ -143,6 +144,10 @@ int set(char *key, char *value, int keylen, int valuelen) {
 void init(int tablesize) {
 	tl = tablesize;
 	hashtable = (struct hash*)calloc(tl, sizeof(struct hash));
+	for(int i = 0; i < tablesize; i++){
+		hashtable[i].head = NULL;
+		hashtable[i].count = 0;
+	}
 }
 
 // free the allocated memory of the hashtable

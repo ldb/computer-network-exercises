@@ -7,11 +7,6 @@
 #define CMD_ACK 8
 #define CMD_INL 128
 
-#define HEADER_SIZE_EXT 6
-#define HEADER_SIZE_INL 14
-#define HASH_SPACE 100
-#define SELF_HASH_SPACE 25
-
 typedef struct header {
     unsigned int set : 1;
     unsigned int get : 1;
@@ -32,6 +27,16 @@ void printBinary(char *binaryChar, int len);
 
 int recv_all(header_t *incoming_header, int socket, unsigned char *request_header, char **key_buffer, char **value_buffer, int headersize);
 
-int sendToNextPeer(header_t *outgoing_header, char **key_buffer, char **value_buffer);
+int robertReceive(header_t *incoming_header, int socket, unsigned char *request_header, char *key_buffer, char *value_buffer, int headersize);
+
+int sendToNextPeer(header_t *outgoing_header, char *key_buffer, char *value_buffer);
+
+int sendToFirstPeer(header_t *outgoing_header, char *key_buffer, char *value_buffer);
+
+header_t *receiveHeader(int socket);
+
+char *receiveKey(int key_len, int socket);
+
+char *receiveValue(int value_len, int socket);
 
 #endif

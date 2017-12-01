@@ -11,19 +11,12 @@
 #include <time.h>
 #include "hashtable.h"
 #include "rpc_server.h"
-#include "marhsalling.h"
-/*
-#define CMD_DEL 1
-#define CMD_SET 2
-#define CMD_GET 4
-#define CMD_ACK 8
-#define CMD_INL 128
+#include "marshalling.h"
 
 #define HEADER_SIZE_EXT 6
 #define HEADER_SIZE_INL 14
-
-unsigned int HASH_SPACE = 100; // Maximum number of nodes in the ring
-unsigned int SELF_HASH_SPACE = 25;*/
+#define HASH_SPACE 25
+#define SELF_HASH_SPACE 25
 
 char *SELF_IP;
 char *NEXT_IP;
@@ -34,72 +27,6 @@ char *PREV_PORT;
 char *SELF_ID;
 char *NEXT_ID;
 char *PREV_ID;
-/*
-typedef struct header {
-    unsigned int set : 1;
-    unsigned int get : 1;
-    unsigned int del : 1;
-    unsigned int ack : 1;
-    unsigned int inl : 1;
-    unsigned int tid : 8;
-    unsigned short k_l: 16;
-    unsigned short v_l: 16;
-    unsigned short id : 16;
-    unsigned int ip : 32;
-    unsigned short port: 16;
-} header_t;
-
-void unmarshal(header_t *out_header, unsigned char *in_header) {
-    out_header->set = (unsigned int) (in_header[0] & CMD_SET) == CMD_SET;
-    out_header->del = (unsigned int) (in_header[0] & CMD_DEL) == CMD_DEL;
-    out_header->get = (unsigned int) (in_header[0] & CMD_GET) == CMD_GET;
-    out_header->ack = (unsigned int) (in_header[0] & CMD_ACK) == CMD_ACK;
-    out_header->inl = (unsigned int) (in_header[0] & CMD_INL) == CMD_INL;
-    out_header->tid = (unsigned int) in_header[1];
-    out_header->k_l = (unsigned short) (in_header[2] << 8);
-    out_header->k_l += (unsigned short) (in_header[3]);
-    out_header->v_l = (unsigned short) (in_header[4] << 8);
-    out_header->v_l += (unsigned short) (in_header[5]);
-
-    if (!out_header->inl) {
-        return;
-    }
-
-    out_header->id = (unsigned short) (in_header[6] << 8);
-    out_header->id += (unsigned short) (in_header[7]);
-    out_header->ip = (unsigned int) (in_header[8] << 24);
-    out_header->ip += (unsigned int) (in_header[9] << 16);
-    out_header->ip += (unsigned int) (in_header[10] << 8);
-    out_header->ip += (unsigned int) (in_header[11]);
-    out_header->port = (unsigned short) (in_header[12] << 8);
-    out_header->port += (unsigned short) (in_header[13]);
-}
-
-void marshal(char *out_header, header_t *in_header) {
-    out_header[0] += (unsigned char) (in_header->set * CMD_SET);
-    out_header[0] += (unsigned char) (in_header->del * CMD_DEL);
-    out_header[0] += (unsigned char) in_header->get * CMD_GET;
-    out_header[0] += (unsigned char) in_header->ack * CMD_ACK;
-    out_header[1] = (unsigned char) in_header->tid;
-    out_header[2] = (unsigned char) (in_header->k_l >> 8);
-    out_header[3] = (unsigned char) (in_header->k_l % 256);
-    out_header[4] = (unsigned char) (in_header->v_l >> 8);
-    out_header[5] = (unsigned char) (in_header->v_l % 256);
-
-    if (!in_header->inl) {
-        return;
-    }
-
-    out_header[0] += (unsigned char) (in_header->inl * CMD_INL);
-    out_header[6] = (unsigned char) (in_header->id >> 8);   //die ersten 8 Stellen der ID als MSB, erste Hälfte ins erste Byte der ID
-    out_header[7] = (unsigned char) (in_header->id % 256);  //die letzten 8 Stellen der ID als LSB, zweite Hälfte ins zweite Byte der ID
-    out_header[8] = (unsigned char) (in_header->ip >> 24);
-    out_header[9] = (unsigned char) (in_header->ip >> 16);
-    out_header[10] = (unsigned char) (in_header->ip >> 8);
-    out_header[11] = (unsigned char) (in_header->ip % 256);
-    out_header[12] = (unsigned char) (in_header->port >> 8);
-    out_header[13] = (unsigned char) (in_header->port % 256);
-}
 
 void printHeader(header_t *header) {
     printf("set: %d\n", header->set);
@@ -114,7 +41,7 @@ void printHeader(header_t *header) {
     printf("k_l: %d\n", header->k_l);
     printf("v_l: %d\n", header->k_l);
 }
-*/
+
 void printBinary(char *binaryChar, int len) {
     for (int j = 0; j < len; j++) {
         for (int i = 0; i < 8; i++) {
@@ -127,6 +54,8 @@ void printBinary(char *binaryChar, int len) {
 int recv_all(header_t *incoming_header, int socket, unsigned char *request_header, char **key_buffer, char **value_buffer, int headersize) {
     char *request_ptr = (char *) request_header;
     int read_size = headersize;
+
+    printf("read_size: %d\n", read_size);
 
     ssize_t rs = 0;
     int read = 0;
@@ -144,6 +73,7 @@ int recv_all(header_t *incoming_header, int socket, unsigned char *request_heade
             unmarshal(incoming_header, &request_header[0]);
             //printHeader(incoming_header);
             read_size = incoming_header->k_l;
+            printf("KEYBUFFER SIZE: %d\n", incoming_header->k_l);
             printf("kl: %d\n", incoming_header->k_l);
             request_ptr = *key_buffer = malloc(read_size);
             read = 0;
@@ -153,7 +83,7 @@ int recv_all(header_t *incoming_header, int socket, unsigned char *request_heade
 
         if (read == incoming_header->k_l && incoming_header->v_l > 0 && twice == 1) {
             twice++;
-            request_ptr = *value_buffer = malloc(incoming_header->v_l);
+            request_ptr = *value_buffer = malloc(incoming_header->v_l-1);
             read_size = incoming_header->v_l;
             printf("vl: %d\n", incoming_header->v_l);
             read = 0;
@@ -166,13 +96,102 @@ int recv_all(header_t *incoming_header, int socket, unsigned char *request_heade
     return 0;
 }
 
-int sendToNextPeer(header_t *outgoing_header, char **key_buffer, char **value_buffer){
-	printf("Peer Number %d sent to next peer number %d\n", atoi(SELF_ID), atoi(NEXT_ID));
+int robertReceive(header_t *incoming_header, int socket, unsigned char *request_header, char *key_buffer, char *value_buffer, int headersize){
+	char *request_ptr = (char *) request_header;
+	int rs = 0;
+    int read_size = headersize;
+    printf("1read_size: %d\n", read_size);
 
-    outgoing_header->inl = 1;
-    outgoing_header->id = atoi(SELF_ID);
-    outgoing_header->port = atoi(SELF_PORT);
-    outgoing_header->ip = atoi(SELF_IP);
+    if ((rs = recv(socket, request_ptr, read_size, 0)) < 0) {
+        fprintf(stderr, "recv: %s\n", strerror(errno));
+        return 2;
+    }
+
+    unmarshal(incoming_header, &request_header[0]);
+    /*
+
+    read_size = incoming_header->k_l;
+    char *tmp_buffer = (char*)malloc(read_size*sizeof(char));
+    key_buffer = (char*)malloc(read_size*sizeof(char)+1);
+
+    if ((rs = recv(socket, tmp_buffer, read_size, 0)) < 0) {
+        fprintf(stderr, "recv: %s\n", strerror(errno));
+        return 2;
+    }
+
+    memcpy(key_buffer, tmp_buffer, read_size);
+
+    printf("key_buffer: %s\n", key_buffer);
+
+    free(tmp_buffer);
+
+    key_buffer[read_size] = '\0';
+
+    read_size = incoming_header->v_l;
+    tmp_buffer = (char*)malloc(read_size*sizeof(char));
+    value_buffer = (char*)malloc(read_size*sizeof(char)+1);
+    printf("2read_size: %d\n", read_size);
+
+    if ((rs = recv(socket, tmp_buffer, read_size, 0)) < 0) {
+        fprintf(stderr, "recv: %s\n", strerror(errno));
+        printf("is there an error?\n");
+        return 2;
+    }
+
+    memcpy(value_buffer, tmp_buffer, read_size);
+
+    value_buffer[read_size] = '\0';
+*/
+    return 0;
+}
+
+header_t *receiveHeader(int socket){
+	unsigned char request_header[HEADER_SIZE_EXT];
+	int read_size = HEADER_SIZE_EXT;
+	int rs = 0;
+	header_t *incoming_header = (header_t*)malloc(sizeof(header_t));
+
+	if ((rs = recv(socket, request_header, read_size, 0)) < 0) {
+        fprintf(stderr, "recv: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    unmarshal(incoming_header, &request_header[0]);
+
+	return incoming_header;
+}
+
+char *receiveKey(int key_len, int socket){
+	char *key_buffer = malloc(key_len+1);
+	int rs = 0;
+
+	if ((rs = recv(socket, key_buffer, key_len, 0)) < 0) {
+        fprintf(stderr, "recv: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    key_buffer[key_len] = '\0';
+
+	return key_buffer;
+}
+
+char *receiveValue(int value_len, int socket){
+	char *value_buffer = malloc(value_len+1);
+	int rs = 0;
+
+	if ((rs = recv(socket, value_buffer, value_len, 0)) < 0) {
+        fprintf(stderr, "recv: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    value_buffer[value_len] = '\0';
+
+	return value_buffer;
+}
+
+
+int sendToNextPeer(header_t *outgoing_header, char *key_buffer, char *value_buffer){
+	printf("Peer Number %d sent to next peer number %d\n", atoi(SELF_ID), atoi(NEXT_ID));
 
     printf("outgoing_header:\n");
     printHeader(outgoing_header);
@@ -223,6 +242,10 @@ int sendToNextPeer(header_t *outgoing_header, char **key_buffer, char **value_bu
 	} while (0 < to_send);
 	outbuffer -= final_size;
 
+	return 0;
+}
+
+int sendToFirstPeer(header_t *outgoing_header, char *key_buffer, char *value_buffer){
 	return 0;
 }
 
@@ -294,12 +317,11 @@ int main(int argc, char *argv[]) {
             ssize_t read = 0;
             int twice = 0;*/
 
-        header_t incoming_header;
-        header_t *incoming_header_ptr = &incoming_header;
-        memset(incoming_header_ptr, 0, sizeof(header_t));
+        //header_t *incoming_header_ptr = &incoming_header;
+        //memset(incoming_header_ptr, 0, sizeof(header_t));
 
-        char *key_buffer = NULL;
-        char *value_buffer = NULL;
+        //char *key_buffer = NULL;
+        //char *value_buffer = NULL;
         printf("[recv] Receiving Data\n");
        /*     do {
                 if ((rs = recv(temp_socket, request_ptr, read_size, 0)) < 0) {
@@ -328,60 +350,86 @@ int main(int argc, char *argv[]) {
                 request_ptr += rs;
             } while (rs > 0 && read < read_size);*/
 
-        recv_all(incoming_header_ptr, temp_socket, &request_header[0], &key_buffer, &value_buffer, sizeof request_header);
+        header_t *incoming_header = receiveHeader(temp_socket);
+        char *key_buffer = receiveKey(incoming_header->k_l, temp_socket);
+        char *value_buffer = receiveValue(incoming_header->v_l, temp_socket);
 
-        header_t outgoing_header;
-        memset(&outgoing_header, 0, sizeof outgoing_header);
+        //printBinary(key_buffer, incoming_header.k_l);
+        //printf("keybuffer: %s\n", key_buffer);
 
-        int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
+        header_t *outgoing_header = (header_t*)malloc(sizeof(header_t));
+        memset(outgoing_header, 0, sizeof(header_t));
+        printf("key_buffer: %s\n", key_buffer);
+        int key_hash = hash(key_buffer, incoming_header->k_l) % HASH_SPACE;
 
-        if (key_hash >= (atoi(SELF_ID) - 1) + SELF_HASH_SPACE && !incoming_header.inl){
-        	printf("OOOPS BOOOOY\n");
-            sendToNextPeer(&outgoing_header, &key_buffer, &value_buffer);
+        if (key_hash >= (atoi(SELF_ID) - 1) + SELF_HASH_SPACE && !incoming_header->inl){
+        	printf("will send it to the next peer firstly\n");
+        	outgoing_header->inl = 1;
+		    outgoing_header->id = atoi(SELF_ID);
+		    outgoing_header->port = atoi(SELF_PORT);
+		    outgoing_header->ip = atoi(SELF_IP);
 
-        } else {
-            if (incoming_header.set) {
+            sendToNextPeer(outgoing_header, key_buffer, value_buffer);
+        }
+       	else if(key_hash >= (atoi(SELF_ID) - 1) + SELF_HASH_SPACE && incoming_header->inl){
+       		printf("will send it to the next peer\n");
+       		sendToNextPeer(outgoing_header, key_buffer, value_buffer);
+       	}
+       	else if(incoming_header->inl){
+       		printf("gotcha\n");
+       		sendToFirstPeer(outgoing_header, key_buffer, value_buffer);
+       	}
+        else {
+        	printf("can handle it on my own!\n");
+            if (incoming_header->set) {
                 printf("[recv] Received SET Command\n");
+                printf("what i can print:\n");
+                printf("key_buffer: %s\n", key_buffer);
+                printf("value_buffer: %s\n", value_buffer);
+                printf("key_length: %d\n", (int)incoming_header->k_l);
+                printf("value_length: %d\n", (int)incoming_header->v_l);
 
                 //printBinary(key_buffer, incoming_header.k_l);
                 //printBinary(value_buffer, incoming_header.v_l);
-
-                outgoing_header.set = set(key_buffer, value_buffer, (int)incoming_header.k_l, (int)incoming_header.v_l);
-                outgoing_header.k_l = outgoing_header.v_l = 0;
+                outgoing_header->set = set(key_buffer, value_buffer, (int)incoming_header->k_l, (int)incoming_header->v_l);
+                printf("did the set\n");
+                outgoing_header->k_l = outgoing_header->v_l = 0;
             }
 
-            if (incoming_header.get) {
+            if (incoming_header->get) {
                 printf("[recv] Received GET Command\n");
                 struct element *e;
-                if ((e = get(key_buffer, incoming_header.k_l)) != NULL) {
+                if ((e = get(key_buffer, incoming_header->k_l)) != NULL) {
                     value_buffer = malloc(e->valuelen);
                     memcpy(value_buffer, e->value, (size_t) e->valuelen);
-                    outgoing_header.v_l = e->valuelen;
-                    outgoing_header.get = 1;
-                    outgoing_header.k_l = e->keylen;
+                    outgoing_header->v_l = e->valuelen;
+                    outgoing_header->get = 1;
+                    outgoing_header->k_l = e->keylen;
                 }
             }
 
-            if (incoming_header.del) {
+            if (incoming_header->del) {
                 printf("[recv] Received DEL Command\n");
-                outgoing_header.del = del(key_buffer, incoming_header.k_l);
-                outgoing_header.k_l = outgoing_header.v_l = 0;
+                outgoing_header->del = del(key_buffer, incoming_header->k_l);
+                outgoing_header->k_l = outgoing_header->v_l = 0;
             }
 
-            outgoing_header.ack = 1;
-            outgoing_header.tid = incoming_header.tid;
+            outgoing_header->ack = 1;
+            outgoing_header->tid = incoming_header->tid;
         }
+
+        printf("finished function!\n");
 
         char h[HEADER_SIZE_EXT] = "000000";
         char *out_header = h;
-        marshal(out_header, &outgoing_header);
+        marshal(out_header, outgoing_header);
 
-        size_t final_size = outgoing_header.k_l + outgoing_header.v_l + HEADER_SIZE_EXT;
+        size_t final_size = outgoing_header->k_l + outgoing_header->v_l + HEADER_SIZE_EXT;
         char *outbuffer = malloc(final_size);
 
         memcpy(outbuffer, out_header, HEADER_SIZE_EXT);
-        memcpy(outbuffer + HEADER_SIZE_EXT, key_buffer, outgoing_header.k_l);
-        memcpy(outbuffer + HEADER_SIZE_EXT + outgoing_header.k_l, value_buffer, outgoing_header.v_l);
+        memcpy(outbuffer + HEADER_SIZE_EXT, key_buffer, outgoing_header->k_l);
+        memcpy(outbuffer + HEADER_SIZE_EXT + outgoing_header->k_l, value_buffer, outgoing_header->v_l);
 
         int to_send = final_size;
 
