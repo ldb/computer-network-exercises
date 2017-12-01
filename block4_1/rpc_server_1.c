@@ -10,7 +10,9 @@
 #include <unistd.h>
 #include <time.h>
 #include "hashtable.h"
-
+#include "rpc_server.h"
+#include "marhsalling.h"
+/*
 #define CMD_DEL 1
 #define CMD_SET 2
 #define CMD_GET 4
@@ -21,7 +23,7 @@
 #define HEADER_SIZE_INL 14
 
 unsigned int HASH_SPACE = 100; // Maximum number of nodes in the ring
-unsigned int SELF_HASH_SPACE = 25;
+unsigned int SELF_HASH_SPACE = 25;*/
 
 char *SELF_IP;
 char *NEXT_IP;
@@ -32,7 +34,7 @@ char *PREV_PORT;
 char *SELF_ID;
 char *NEXT_ID;
 char *PREV_ID;
-
+/*
 typedef struct header {
     unsigned int set : 1;
     unsigned int get : 1;
@@ -112,7 +114,7 @@ void printHeader(header_t *header) {
     printf("k_l: %d\n", header->k_l);
     printf("v_l: %d\n", header->k_l);
 }
-
+*/
 void printBinary(char *binaryChar, int len) {
     for (int j = 0; j < len; j++) {
         for (int i = 0; i < 8; i++) {
@@ -140,7 +142,7 @@ int recv_all(header_t *incoming_header, int socket, unsigned char *request_heade
         if (twice == 0) {
             twice++;
             unmarshal(incoming_header, &request_header[0]);
-            printHeader(incoming_header);
+            //printHeader(incoming_header);
             read_size = incoming_header->k_l;
             printf("kl: %d\n", incoming_header->k_l);
             request_ptr = *key_buffer = malloc(read_size);
@@ -164,8 +166,68 @@ int recv_all(header_t *incoming_header, int socket, unsigned char *request_heade
     return 0;
 }
 
+int sendToNextPeer(header_t *outgoing_header, char **key_buffer, char **value_buffer){
+	printf("Peer Number %d sent to next peer number %d\n", atoi(SELF_ID), atoi(NEXT_ID));
+
+    outgoing_header->inl = 1;
+    outgoing_header->id = atoi(SELF_ID);
+    outgoing_header->port = atoi(SELF_PORT);
+    outgoing_header->ip = atoi(SELF_IP);
+
+    printf("outgoing_header:\n");
+    printHeader(outgoing_header);
+
+    char h[HEADER_SIZE_INL] = "00000000000000";
+	char *out_header = h;
+	marshal(out_header, outgoing_header);
+
+	size_t final_size = outgoing_header->k_l + outgoing_header->v_l + HEADER_SIZE_INL;
+    char *outbuffer = malloc(final_size);
+
+    memcpy(outbuffer, out_header, HEADER_SIZE_INL);
+    memcpy(outbuffer + HEADER_SIZE_INL, key_buffer, outgoing_header->k_l);
+    memcpy(outbuffer + HEADER_SIZE_INL + outgoing_header->k_l, value_buffer, outgoing_header->v_l);
+
+    int to_send = final_size;
+
+	struct addrinfo hints, *res;
+	int status;
+
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+
+	if((status = getaddrinfo(NEXT_IP, NEXT_PORT, &hints, &res)) != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", strerror(status));
+		return 2;
+	}
+
+	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	
+	if(connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
+		fprintf(stderr, "connect: %s\n", strerror(errno));
+		return 2;
+	}
+
+	do {
+		int sent;
+		if((sent = send(sockfd, outbuffer, to_send, 0)) == -1){
+			fprintf(stderr, "send: %s\n", strerror(errno));
+			return 2;
+		}
+
+		printf("[i] Sent %d bytes\n", sent);
+
+		to_send -= sent;
+		outbuffer += sent;
+	} while (0 < to_send);
+	outbuffer -= final_size;
+
+	return 0;
+}
+
 int main(int argc, char *argv[]) {
-    if (argc != 7) {
+    if (argc != 8) {
         fprintf(stderr, "arguments: port, id, previous port, previous id, next port, next id, ip-adress\n");
         return 1;
     }
@@ -273,21 +335,16 @@ int main(int argc, char *argv[]) {
 
         int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
 
-        if (key_hash >= (atoi(SELF_ID) - 1) + SELF_HASH_SPACE){
-            printf("Peer Number %d sent to next peer number %d\n", atoi(SELF_ID), atoi(NEXT_ID));
-
-            outgoing_header.set = incoming_header.set;
-            outgoing_header.get = incoming_header.get;
-            outgoing_header.del = incoming_header.del;
-            outgoing_header.ack = 0;
-            outgoing_header.inl = 1;
+        if (key_hash >= (atoi(SELF_ID) - 1) + SELF_HASH_SPACE && !incoming_header.inl){
+        	printf("OOOPS BOOOOY\n");
+            sendToNextPeer(&outgoing_header, &key_buffer, &value_buffer);
 
         } else {
             if (incoming_header.set) {
                 printf("[recv] Received SET Command\n");
 
-                printBinary(key_buffer, incoming_header.k_l);
-                printBinary(value_buffer, incoming_header.v_l);
+                //printBinary(key_buffer, incoming_header.k_l);
+                //printBinary(value_buffer, incoming_header.v_l);
 
                 outgoing_header.set = set(key_buffer, value_buffer, (int)incoming_header.k_l, (int)incoming_header.v_l);
                 outgoing_header.k_l = outgoing_header.v_l = 0;
