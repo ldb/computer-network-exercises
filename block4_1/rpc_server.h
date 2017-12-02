@@ -27,11 +27,11 @@ void printBinary(char *binaryChar, int len);
 
 int recv_all(header_t *incoming_header, int socket, unsigned char *request_header, char **key_buffer, char **value_buffer, int headersize);
 
-int robertReceive(header_t *incoming_header, int socket, unsigned char *request_header, char *key_buffer, char *value_buffer, int headersize);
+int sendToNextPeer(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket);
 
-int sendToNextPeer(header_t *outgoing_header, char *key_buffer, char *value_buffer);
+int sendInfosBack(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer);
 
-int sendToFirstPeer(header_t *outgoing_header, char *key_buffer, char *value_buffer);
+int sendInfosToClient(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket);
 
 header_t *receiveHeader(int socket);
 

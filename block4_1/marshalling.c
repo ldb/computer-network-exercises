@@ -18,7 +18,7 @@ void unmarshal(header_t *out_header, unsigned char *in_header) {
     out_header->v_l = (unsigned short) (in_header[4] << 8);
     out_header->v_l += (unsigned short) (in_header[5]);
 
-    if (!out_header->inl) {
+    if (!out_header->inl || out_header->inl == 0) {
         return;
     }
 
@@ -43,7 +43,7 @@ void marshal(char *out_header, header_t *in_header) {
     out_header[4] = (unsigned char) (in_header->v_l >> 8);
     out_header[5] = (unsigned char) (in_header->v_l % 256);
 
-    if (!in_header->inl) {
+    if (!in_header->inl || in_header->inl == 0) {
         return;
     }
 

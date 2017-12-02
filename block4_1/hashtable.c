@@ -104,9 +104,8 @@ int del(char *key, int keylen) {
 // element and save the new one
 // uses chaining when two different elements have the same hashValue
 void setElement(struct element *e) {
-	unsigned int hashValue = hash(e->key, e->keylen);
+	unsigned int hashValue = hash(e->key, e->keylen) % tl;
 
-	printf("is it maybe\n");
 	struct element *tmp = hashtable[hashValue].head;
 
 	if (tmp == NULL) {
@@ -144,7 +143,7 @@ int set(char *key, char *value, int keylen, int valuelen) {
 void init(int tablesize) {
 	tl = tablesize;
 	hashtable = (struct hash*)calloc(tl, sizeof(struct hash));
-	for(int i = 0; i < tablesize; i++){
+	for(int i = 0; i < tl; i++){
 		hashtable[i].head = NULL;
 		hashtable[i].count = 0;
 	}

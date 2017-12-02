@@ -101,10 +101,6 @@ void printHeader(header_t *header) {
     printf("del: %d\n", header->del);
     printf("ack: %d\n", header->ack);
     printf("tid: %d\n", header->tid);
-    printf("inl: %d\n", header->inl);
-    printf("id: %d\n", header->id);
-    printf("ip %d\n", header->ip);
-    printf("port: %d\n", header->port);
     printf("k_l: %d\n", header->k_l);
     printf("v_l: %d\n", header->k_l);
 }
@@ -156,7 +152,7 @@ int recv_all(header_t *incoming_header, int socket, unsigned char *request_heade
 
         request_ptr += rs;
     } while (rs > 0 && read < read_size);
-    printf("done reading\n");
+    printf("done readong\n");
     return 0;
 }
 
@@ -175,7 +171,7 @@ int main(int argc, char *argv[]) {
     int status;
 
     // Initialize Hashtagble of size 100
-    //init(100);
+    init(100);
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC; // Do not specify IPv4 or IPv6 explicitely
