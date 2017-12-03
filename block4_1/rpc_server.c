@@ -91,7 +91,7 @@ char *receiveValue(int value_len, int socket) {
 	return value_buffer;
 }
 
-int sendToNextPeer(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket) {
+int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket) {
 	printf("[%s] request from peer %s\n", SELF_ID, NEXT_ID);
 
 	if (incoming_header->inl == 0) {
@@ -165,7 +165,7 @@ int sendToNextPeer(header_t *outgoing_header, header_t *incoming_header, char *k
 	return 0;
 }
 
-int sendInfosBack(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer) {
+int respondToPeer(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer) {
 	printf("[%s] respond to peer %d\n", SELF_ID, incoming_header->id);
 
 	outgoing_header->inl = 1;
@@ -227,10 +227,9 @@ int sendInfosBack(header_t *outgoing_header, header_t *incoming_header, char *ke
 	return 0;
 }
 
-int sendInfosToClient(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket) {
-	// when the get function was successful (value length is not zero) and internal, set the get bit to 1
-	// when the get function was unsuccessful and internal, let it on 0
-	// when the get function was external, get is already correctly set
+int respondToClient(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket) {
+	printf("[%s] respond to client\n", SELF_ID);
+
 	if (incoming_header->inl == 1 && incoming_header->v_l != 0) {
 		outgoing_header->get = 1;
 		outgoing_header->v_l = incoming_header->v_l;
@@ -347,9 +346,9 @@ int main(int argc, char *argv[]) {
 
 		// Operation was already completed by other peer, we should respond to client
 		if (incoming_header->inl == 1 && incoming_header->ack == 1) {
-			sendInfosToClient(outgoing_header, incoming_header, key_buffer, value_buffer, temp_socket);
+			respondToClient(outgoing_header, incoming_header, key_buffer, value_buffer, temp_socket);
 		} else if (key_hash > (atoi(SELF_ID) + SELF_HASH_SPACE)) {
-			sendToNextPeer(outgoing_header, incoming_header, key_buffer, value_buffer, temp_socket);
+			requestFromNextPeer(outgoing_header, incoming_header, key_buffer, value_buffer, temp_socket);
 		} else {
 			if (incoming_header->set) {
 				printf("[%s][recv] Received SET Command\n", SELF_ID);
@@ -381,9 +380,9 @@ int main(int argc, char *argv[]) {
 			outgoing_header->tid = incoming_header->tid;
 
 			if (incoming_header->inl == 1) {
-				sendInfosBack(outgoing_header, incoming_header, key_buffer, value_buffer);
+				respondToPeer(outgoing_header, incoming_header, key_buffer, value_buffer);
 			} else {
-				sendInfosToClient(outgoing_header, incoming_header, key_buffer, value_buffer, temp_socket);
+				respondToClient(outgoing_header, incoming_header, key_buffer, value_buffer, temp_socket);
 				close(temp_socket);
 			}
 		}
