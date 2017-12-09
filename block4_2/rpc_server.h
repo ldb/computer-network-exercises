@@ -18,10 +18,6 @@ typedef struct header {
 	unsigned short v_l: 16;
 } header_t;
 
-void printHeader(header_t *header);
-
-void printBinary(char *binaryChar, int len);
-
 int recv_all(header_t *incoming_header, int socket, unsigned char *request_header, char **key_buffer, char **value_buffer, int headersize);
 
 int sendToNextPeer(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket);

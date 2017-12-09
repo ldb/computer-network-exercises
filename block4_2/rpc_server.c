@@ -52,8 +52,8 @@ int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, ch
 	outgoing_header->k_l = incoming_header->k_l;
 	outgoing_header->v_l = incoming_header->v_l;
 
-	char h[HEADER_SIZE_INT] = "00000000000000";
-	char *out_header = h;
+	unsigned char h[HEADER_SIZE_INT] = "00000000000000";
+	unsigned char *out_header = h;
 	marshal(out_header, outgoing_header);
 
 	size_t final_size = outgoing_header->k_l + outgoing_header->v_l + HEADER_SIZE_INT;
@@ -110,8 +110,8 @@ int respondToPeer(header_t *outgoing_header, header_t *incoming_header, char *ke
 	outgoing_header->tid = incoming_header->tid;
 	outgoing_header->ack = 1;
 
-	char h[HEADER_SIZE_INT] = "00000000000000";
-	char *out_header = h;
+	unsigned char h[HEADER_SIZE_INT] = "00000000000000";
+	unsigned char *out_header = h;
 	marshal(out_header, outgoing_header);
 
 	size_t final_size = outgoing_header->k_l + outgoing_header->v_l + HEADER_SIZE_INT;
@@ -177,8 +177,8 @@ int respondToClient(header_t *outgoing_header, header_t *incoming_header, char *
 	outgoing_header->tid = incoming_header->tid;
 	outgoing_header->ack = 1;
 
-	char h[HEADER_SIZE_EXT] = "000000";
-	char *out_header = h;
+	unsigned char h[HEADER_SIZE_EXT] = "000000";
+	unsigned char *out_header = h;
 	marshal(out_header, outgoing_header);
 
 	size_t final_size = outgoing_header->k_l + outgoing_header->v_l + HEADER_SIZE_EXT;
@@ -277,6 +277,9 @@ int main(int argc, char *argv[]) {
 		unsigned char request_header[HEADER_SIZE_INT];
 		char *request_ptr = (char *) request_header;
 		memset(&request_header, 0, sizeof request_header);
+		//request_header[0] = request_header[0] >> 8;
+
+		printBinary(&request_header[0], HEADER_SIZE_INT);
 
 		int read_size = HEADER_SIZE_EXT;
 
@@ -322,6 +325,11 @@ int main(int argc, char *argv[]) {
 				request_ptr = key_buffer = malloc(read_size);
 				thrice++;
 				read = 0;
+
+				printBinary(&request_header[0], HEADER_SIZE_INT);
+				//printHeader(&incoming_header);
+
+				continue;
 			}
 
 			if (thrice == 2 && read == incoming_header.k_l && incoming_header.v_l > 0) {

@@ -14,6 +14,10 @@
 
 void unmarshal(header_t *out_header, unsigned char *in_header);
 
-void marshal(char *out_header, header_t *in_header);
+void marshal(unsigned char *out_header, header_t *in_header);
+
+void printHeader(header_t *header);
+
+void printBinary(unsigned char *binaryChar, int len);
 
 #endif

@@ -37,7 +37,7 @@ void unmarshal(header_t *out_header, unsigned char *in_header) {
 	out_header->port += (unsigned short) (in_header[13]);
 }
 
-void marshal(char *out_header, header_t *in_header) {
+void marshal(unsigned char *out_header, header_t *in_header) {
 	out_header[0] += (unsigned char) in_header->get * CMD_GET;
 	out_header[0] += (unsigned char) in_header->ack * CMD_ACK;
 	out_header[0] += (unsigned char) (in_header->set * CMD_SET);
@@ -87,7 +87,7 @@ void printHeader(header_t *header) {
 	printf("stbz: %d\n", header->stbz);
 }
 
-void printBinary(char *binaryChar, int len) {
+void printBinary(unsigned char *binaryChar, int len) {
 	for (int j = 0; j < len; j++) {
 		for (int i = 0; i < 8; i++) {
 			printf("%d", !!((binaryChar[j] << i) & 0x80));
