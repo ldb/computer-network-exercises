@@ -14,7 +14,7 @@
 #include "marshalling.h"
 
 #define HEADER_SIZE_EXT 6
-#define HEADER_SIZE_INL 14
+#define HEADER_SIZE_INT 14
 #define HASH_SPACE 100
 #define SELF_HASH_SPACE 25
 
@@ -29,29 +29,10 @@ char *NEXT_ID;
 char *PREV_ID;
 int CLIENT_SOCKET; // Save socket information of client
 
-void printHeader(header_t *header) {
-	printf("set: %d\n", header->set);
-	printf("get: %d\n", header->get);
-	printf("del: %d\n", header->del);
-	printf("ack: %d\n", header->ack);
-	printf("tid: %d\n", header->tid);
-	printf("k_l: %d\n", header->k_l);
-	printf("v_l: %d\n", header->v_l);
-}
-
-void printBinary(char *binaryChar, int len) {
-	for (int j = 0; j < len; j++) {
-		for (int i = 0; i < 8; i++) {
-			printf("%d", !!((binaryChar[j] << i) & 0x80));
-		}
-		printf(" %c\n", binaryChar[j]);
-	}
-}
-
 int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket) {
 	printf("[%s] request from peer %s\n", SELF_ID, NEXT_ID);
 
-	if (incoming_header->inl == 0) {
+	if (incoming_header->intl == 0) {
 		outgoing_header->id = atoi(SELF_ID);
 		outgoing_header->port = atoi(SELF_PORT);
 		outgoing_header->ip = atoi(SELF_IP);
@@ -62,7 +43,7 @@ int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, ch
 		outgoing_header->port = incoming_header->port;
 	}
 
-	outgoing_header->inl = 1;
+	outgoing_header->intl = 1;
 	outgoing_header->ack = 0;
 	outgoing_header->set = incoming_header->set;
 	outgoing_header->get = incoming_header->get;
@@ -71,16 +52,16 @@ int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, ch
 	outgoing_header->k_l = incoming_header->k_l;
 	outgoing_header->v_l = incoming_header->v_l;
 
-	char h[HEADER_SIZE_INL] = "00000000000000";
+	char h[HEADER_SIZE_INT] = "00000000000000";
 	char *out_header = h;
 	marshal(out_header, outgoing_header);
 
-	size_t final_size = outgoing_header->k_l + outgoing_header->v_l + HEADER_SIZE_INL;
+	size_t final_size = outgoing_header->k_l + outgoing_header->v_l + HEADER_SIZE_INT;
 	char *outbuffer = malloc(final_size);
 
-	memcpy(outbuffer, out_header, HEADER_SIZE_INL);
-	memcpy(outbuffer + HEADER_SIZE_INL, key_buffer, outgoing_header->k_l);
-	memcpy(outbuffer + HEADER_SIZE_INL + outgoing_header->k_l, value_buffer, outgoing_header->v_l);
+	memcpy(outbuffer, out_header, HEADER_SIZE_INT);
+	memcpy(outbuffer + HEADER_SIZE_INT, key_buffer, outgoing_header->k_l);
+	memcpy(outbuffer + HEADER_SIZE_INT + outgoing_header->k_l, value_buffer, outgoing_header->v_l);
 
 	struct addrinfo hints, *res;
 	int status;
@@ -125,20 +106,20 @@ int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, ch
 int respondToPeer(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer) {
 	printf("[%s] respond to peer %d\n", SELF_ID, incoming_header->id);
 
-	outgoing_header->inl = 1;
+	outgoing_header->intl = 1;
 	outgoing_header->tid = incoming_header->tid;
 	outgoing_header->ack = 1;
 
-	char h[HEADER_SIZE_INL] = "00000000000000";
+	char h[HEADER_SIZE_INT] = "00000000000000";
 	char *out_header = h;
 	marshal(out_header, outgoing_header);
 
-	size_t final_size = outgoing_header->k_l + outgoing_header->v_l + HEADER_SIZE_INL;
+	size_t final_size = outgoing_header->k_l + outgoing_header->v_l + HEADER_SIZE_INT;
 	char *outbuffer = malloc(final_size);
 
-	memcpy(outbuffer, out_header, HEADER_SIZE_INL);
-	memcpy(outbuffer + HEADER_SIZE_INL, key_buffer, outgoing_header->k_l);
-	memcpy(outbuffer + HEADER_SIZE_INL + outgoing_header->k_l, value_buffer, outgoing_header->v_l);
+	memcpy(outbuffer, out_header, HEADER_SIZE_INT);
+	memcpy(outbuffer + HEADER_SIZE_INT, key_buffer, outgoing_header->k_l);
+	memcpy(outbuffer + HEADER_SIZE_INT + outgoing_header->k_l, value_buffer, outgoing_header->v_l);
 
 	struct addrinfo hints, *res;
 	int status;
@@ -177,7 +158,7 @@ int respondToPeer(header_t *outgoing_header, header_t *incoming_header, char *ke
 	} while (0 < to_send);
 	outbuffer -= final_size;
 
-	free(outbuffer);
+	//free(outbuffer);
 
 	close(sockfd);
 
@@ -187,12 +168,12 @@ int respondToPeer(header_t *outgoing_header, header_t *incoming_header, char *ke
 int respondToClient(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket) {
 	printf("[%s] respond to client\n", SELF_ID);
 
-	if (incoming_header->inl == 1 && incoming_header->v_l != 0) {
+	if (incoming_header->intl == 1 && incoming_header->v_l != 0) {
 		outgoing_header->get = 1;
 		outgoing_header->v_l = incoming_header->v_l;
 	}
 	outgoing_header->k_l = incoming_header->k_l;
-	outgoing_header->inl = 0;
+	outgoing_header->intl = 0;
 	outgoing_header->tid = incoming_header->tid;
 	outgoing_header->ack = 1;
 
@@ -229,7 +210,7 @@ int respondToClient(header_t *outgoing_header, header_t *incoming_header, char *
 
 	close(temp_socket);
 
-	free(outbuffer);
+	//free(outbuffer);
 
 	CLIENT_SOCKET = 0;
 	return 0;
@@ -293,7 +274,7 @@ int main(int argc, char *argv[]) {
 
 		printf("[%s][acpt] New Connection\n", SELF_ID);
 
-		unsigned char request_header[HEADER_SIZE_INL];
+		unsigned char request_header[HEADER_SIZE_INT];
 		char *request_ptr = (char *) request_header;
 		memset(&request_header, 0, sizeof request_header);
 
@@ -322,8 +303,8 @@ int main(int argc, char *argv[]) {
 				unmarshal(&incoming_header, &request_header[0]);
 				read = 0;
 
-				if (incoming_header.inl == 1) {
-					read_size = HEADER_SIZE_INL - HEADER_SIZE_EXT;
+				if (incoming_header.intl == 1) {
+					read_size = HEADER_SIZE_INT - HEADER_SIZE_EXT;
 					request_ptr += rs;
 					thrice++;
 					continue;
@@ -359,7 +340,7 @@ int main(int argc, char *argv[]) {
 		int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
 
 		// Operation was already completed by other peer, we should respond to client
-		if (incoming_header.inl == 1 && incoming_header.ack == 1) {
+		if (incoming_header.intl == 1 && incoming_header.ack == 1) {
 			respondToClient(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 		} else if (key_hash > (atoi(SELF_ID) + SELF_HASH_SPACE)) {
 			requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
@@ -393,7 +374,7 @@ int main(int argc, char *argv[]) {
 			outgoing_header->ack = 1;
 			outgoing_header->tid = incoming_header.tid;
 
-			if (incoming_header.inl == 1) {
+			if (incoming_header.intl == 1) {
 				respondToPeer(outgoing_header, &incoming_header, key_buffer, value_buffer);
 			} else {
 				respondToClient(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
