@@ -18,15 +18,15 @@
 #define HASH_SPACE 100
 #define STBZ_INTERVAL 10000
 
-char *SELF_IP = NULL;
-char *NEXT_IP = NULL;
-char *PREV_IP = NULL;
-char *SELF_PORT = NULL;
-char *NEXT_PORT = NULL;
-char *PREV_PORT = NULL;
-char *SELF_ID = NULL;
-char *NEXT_ID = NULL;
-char *PREV_ID = NULL;
+char *SELF_IP;
+char *NEXT_IP;
+char *PREV_IP;
+char *SELF_PORT;
+char *NEXT_PORT;
+char *PREV_PORT;
+char *SELF_ID;
+char *NEXT_ID;
+char *PREV_ID;
 int CLIENT_SOCKET; // Save socket information of client
 
 int sendData(int socked, char *buffer, int length) {
@@ -35,11 +35,11 @@ int sendData(int socked, char *buffer, int length) {
 	do {
 		int sent;
 		if ((sent = send(socked, buffer, to_send, 0)) == -1) {
-			fprintf(stderr, "[%s][send]: %s\n", SELF_ID, strerror(errno));
+			fprintf(stderr, "[%s][sendData][send]: %s\n", SELF_ID, strerror(errno));
 			return 2;
 		}
 
-		printf("[%s] sent %d bytes\n", SELF_ID, sent);
+		printf("[%s][sendData] sent %d bytes\n", SELF_ID, sent);
 
 		to_send -= sent;
 		buffer += sent;
@@ -114,14 +114,14 @@ int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, ch
 	hints.ai_socktype = SOCK_STREAM;
 
 	if ((status = getaddrinfo(NEXT_IP, NEXT_PORT, &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+		fprintf(stderr, "[%s][requestFromNextPeer][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
-		fprintf(stderr, "[%s][connect]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "[%s][requestFromNextPeer][connect]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
@@ -163,14 +163,14 @@ int respondToPeer(header_t *outgoing_header, header_t *incoming_header, char *ke
 	snprintf(tmp_PORT, sizeof(tmp_PORT), "%d", incoming_header->port);
 
 	if ((status = getaddrinfo(SELF_IP, &tmp_PORT[0], &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+		fprintf(stderr, "[%s][respondToPeer][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
-		fprintf(stderr, "[%s][connect]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "[%s][respondToPeer][connect]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
@@ -247,14 +247,14 @@ int join() {
 	hints.ai_socktype = SOCK_STREAM;
 
 	if ((status = getaddrinfo(NEXT_IP, NEXT_PORT, &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+		fprintf(stderr, "[%s][join][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
-		fprintf(stderr, "[%s][connect]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "[%s][join][connect]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
@@ -285,14 +285,14 @@ int notify() {
 	hints.ai_socktype = SOCK_STREAM;
 
 	if ((status = getaddrinfo(PREV_IP, PREV_PORT, &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+		fprintf(stderr, "[%s][notify][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
-		fprintf(stderr, "[%s][connect]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "[%s][notify][connect]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
@@ -323,14 +323,14 @@ int stabilize() {
 	hints.ai_socktype = SOCK_STREAM;
 
 	if ((status = getaddrinfo(NEXT_IP, NEXT_PORT, &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+		fprintf(stderr, "[%s][stabilize][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
-		fprintf(stderr, "[%s][connect]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "[%s][stabilize][connect]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
@@ -347,7 +347,7 @@ int main(int argc, char *argv[]) {
 	SELF_IP = argv[2];
 	SELF_PORT = argv[3];
 
-	if (argc == 6) {
+	if (argc == 7) {
 		NEXT_ID = argv[4];
 		NEXT_IP = argv[5];
 		NEXT_PORT = argv[6];
@@ -355,12 +355,12 @@ int main(int argc, char *argv[]) {
 
 	// We are alone :(
 	if (!NEXT_ID) {
-		NEXT_ID = SELF_ID;
-		PREV_ID = SELF_ID;
-		NEXT_IP = SELF_IP;
-		PREV_IP = SELF_IP;
-		NEXT_PORT = SELF_PORT;
-		PREV_PORT = SELF_PORT;
+		NEXT_ID = argv[1];
+		PREV_ID = argv[1];
+		NEXT_IP = argv[2];
+		PREV_IP = argv[2];
+		NEXT_PORT = argv[3];
+		PREV_PORT = argv[3];
 	}
 
 	struct addrinfo hints, *res;
@@ -374,7 +374,7 @@ int main(int argc, char *argv[]) {
 	hints.ai_flags = AI_PASSIVE; // Use default local adress
 
 	if ((status = getaddrinfo(NULL, SELF_PORT, &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+		fprintf(stderr, "[%s][main][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
@@ -383,37 +383,40 @@ int main(int argc, char *argv[]) {
 	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
 	if ((sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1) {
-		fprintf(stderr, "[%s][socket]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "[%s][main][socket]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
 	if ((bind(sockfd, res->ai_addr, res->ai_addrlen)) != 0) {
-		fprintf(stderr, "[%s][bind]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "[%s][main][bind]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
 	if ((listen(sockfd, 1)) == -1) {
-		fprintf(stderr, "[%s][listen]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "[%s][main][listen]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
 	printf("[%s] Coming online!\n", SELF_ID);
 
 	int cnt = 1;
+
+	if (!PREV_ID) {
+		printf("[%s] Trying to JOIN!\n", SELF_ID);
+		join();
+	} else if (cnt % STBZ_INTERVAL == -1) {
+		stabilize();
+	}
+
 	while (1) {
 
-		if (!PREV_ID) {
-			join();
-		} else if (cnt % STBZ_INTERVAL == 0) {
-			stabilize();
-		}
 
 		int temp_socket;
 		struct sockaddr_storage incoming_addr;
 		socklen_t addr_size = sizeof incoming_addr;
 		temp_socket = accept(sockfd, (struct sockaddr *) &incoming_addr, &addr_size);
 
-		printf("[%s][acpt] New Connection\n", SELF_ID);
+		printf("[%s][main][acpt] New Connection\n", SELF_ID);
 
 		unsigned char request_header[HEADER_SIZE_INT];
 		char *request_ptr = (char *) request_header;
@@ -431,7 +434,7 @@ int main(int argc, char *argv[]) {
 
 		char *key_buffer = NULL;
 		char *value_buffer = NULL;
-		printf("[%s][recv] Receiving Data\n", SELF_ID);
+		printf("[%s][main][recv] Receiving Data\n", SELF_ID);
 
 		do {
 			if ((rs = recv(temp_socket, request_ptr, read_size, 0)) < 0) {
@@ -481,26 +484,28 @@ int main(int argc, char *argv[]) {
 		header_t *outgoing_header = (header_t*) malloc(sizeof(header_t));
 		memset(outgoing_header, 0, sizeof(header_t));
 		int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
-		printf("[%s][hash] Key hash: %d\n", SELF_ID, key_hash);
+		printf("[%s][main][hash] Key hash: %d\n", SELF_ID, key_hash);
+
+		printf("[%s] PREV: %s, NEXT: %s\n", SELF_ID, PREV_ID, NEXT_ID);
 
 		// Operation was already completed by other peer, we should respond to client
 		if (incoming_header.intl && incoming_header.ack) {
 
 			respondToClient(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 
-		} else if (key_hash > atoi(SELF_ID) && atoi(SELF_ID) > atoi(PREV_ID)) {
+		} else if (key_hash > atoi(SELF_ID) && PREV_ID && atoi(SELF_ID) > atoi(PREV_ID)) {
 
 			requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 
 		} else {
 			if (incoming_header.set) {
-				printf("[%s][recv] Received SET Command\n", SELF_ID);
+				printf("[%s][main][recv] Received SET Command\n", SELF_ID);
 				outgoing_header->set = set(key_buffer, value_buffer, (int)incoming_header.k_l, (int)incoming_header.v_l);
 				outgoing_header->k_l = outgoing_header->v_l = 0;
 			}
 
 			if (incoming_header.get) {
-				printf("[%s][recv] Received GET Command\n", SELF_ID);
+				printf("[%s][main][recv] Received GET Command\n", SELF_ID);
 				struct element *e;
 				e = get(key_buffer, incoming_header.k_l);
 
@@ -514,34 +519,36 @@ int main(int argc, char *argv[]) {
 			}
 
 			if (incoming_header.del) {
-				printf("[%s][recv] Received DEL Command\n", SELF_ID);
+				printf("[%s][main][recv] Received DEL Command\n", SELF_ID);
 				outgoing_header->del = del(key_buffer, incoming_header.k_l);
 				outgoing_header->k_l = outgoing_header->v_l = 0;
 			}
 
 			if (incoming_header.intl && incoming_header.join) {
-				printf("[%s][recv] Received JOIN Command\n", SELF_ID);
+				printf("[%s][main][recv] Received JOIN Command\n", SELF_ID);
 
-				if (incoming_header.id > atoi(SELF_ID) && atoi(SELF_ID) > atoi(PREV_ID)) {
+				if (incoming_header.id > atoi(SELF_ID) && PREV_ID && atoi(SELF_ID) > atoi(PREV_ID)) {
 					requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 				} else {
-					*PREV_ID = incoming_header.id;
-					*PREV_IP = incoming_header.ip;
-					*PREV_PORT = incoming_header.port;
+					*PREV_IP = (char)incoming_header.ip;
+					snprintf(PREV_ID, sizeof(PREV_ID), "%d", incoming_header.id);
+					snprintf(PREV_PORT, sizeof(PREV_PORT), "%d", incoming_header.port);
+					printf("[%s][recv][join] Updated PREV: %s\n", SELF_ID, PREV_ID);
 					notify();
 				}
 			}
 
 			if (incoming_header.intl && incoming_header.noti) {
-				printf("[%s][recv] Received NOTIFY Command\n", SELF_ID);
+				printf("[%s][main][recv] Received NOTIFY Command\n", SELF_ID);
 
-				*NEXT_ID = incoming_header.id;
-				*NEXT_IP = incoming_header.ip;
-				*NEXT_PORT = incoming_header.port;
+				*NEXT_IP = (char)incoming_header.ip;
+				snprintf(NEXT_ID, sizeof(NEXT_ID), "%d", incoming_header.id);
+				snprintf(NEXT_PORT, sizeof(NEXT_PORT), "%d", incoming_header.port);
+				printf("[%s][recv][noti] Updated NEXT: %s\n", SELF_ID, NEXT_ID);
 			}
 
 			if (incoming_header.intl && incoming_header.stbz) {
-				printf("[%s][recv] Received JOIN Command\n", SELF_ID);
+				printf("[%s][main][recv] Received JOIN Command\n", SELF_ID);
 				outgoing_header->id = atoi(PREV_ID);
 				outgoing_header->ip = atoi(PREV_IP);
 				outgoing_header->port = atoi(PREV_PORT);
@@ -549,9 +556,11 @@ int main(int argc, char *argv[]) {
 				respondToPeer(outgoing_header, &incoming_header, key_buffer, value_buffer);
 
 				if (!PREV_ID) {
-					*PREV_ID = incoming_header.id;
-					*PREV_IP = incoming_header.ip;
-					*PREV_PORT = incoming_header.port;
+					*PREV_IP = (char)incoming_header.ip;
+					snprintf(PREV_ID, sizeof(PREV_ID), "%d", incoming_header.id);
+					snprintf(PREV_PORT, sizeof(PREV_PORT), "%d", incoming_header.port);
+					printf("[%s][recv][stbz] Updated PREV: %s\n", SELF_ID, PREV_ID);
+
 				}
 			}
 
@@ -565,7 +574,7 @@ int main(int argc, char *argv[]) {
 				close(temp_socket);
 			}
 		}
-		printf("[%s][send] Closed connection\n", SELF_ID);
+		printf("[%s][main][send] Closed connection\n", SELF_ID);
 
 		//free(key_buffer);
 		//free(value_buffer);
