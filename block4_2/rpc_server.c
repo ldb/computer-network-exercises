@@ -277,9 +277,6 @@ int main(int argc, char *argv[]) {
 		unsigned char request_header[HEADER_SIZE_INT];
 		char *request_ptr = (char *) request_header;
 		memset(&request_header, 0, sizeof request_header);
-		//request_header[0] = request_header[0] >> 8;
-
-		printBinary(&request_header[0], HEADER_SIZE_INT);
 
 		int read_size = HEADER_SIZE_EXT;
 
@@ -304,6 +301,7 @@ int main(int argc, char *argv[]) {
 
 			if (thrice == 0) {
 				unmarshal(&incoming_header, &request_header[0]);
+				printBinary(&request_header[0], HEADER_SIZE_EXT);
 				read = 0;
 
 				if (incoming_header.intl == 1) {
@@ -325,8 +323,6 @@ int main(int argc, char *argv[]) {
 				request_ptr = key_buffer = malloc(read_size);
 				thrice++;
 				read = 0;
-
-				printBinary(&request_header[0], HEADER_SIZE_INT);
 				//printHeader(&incoming_header);
 
 				continue;

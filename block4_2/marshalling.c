@@ -16,7 +16,7 @@ void unmarshal(header_t *out_header, unsigned char *in_header) {
 	out_header->get = (unsigned int) (in_header[0] & CMD_GET) == CMD_GET;
 	out_header->set = (unsigned int) (in_header[0] & CMD_SET) == CMD_SET;
 	out_header->del = (unsigned int) (in_header[0] & CMD_DEL) == CMD_DEL;
-	
+
 	out_header->tid = (unsigned int) in_header[1];
 	out_header->k_l = (unsigned short) (in_header[2] << 8);
 	out_header->k_l += (unsigned short) (in_header[3]);
@@ -38,11 +38,11 @@ void unmarshal(header_t *out_header, unsigned char *in_header) {
 }
 
 void marshal(unsigned char *out_header, header_t *in_header) {
-	out_header[0] += (unsigned char) in_header->get * CMD_GET;
-	out_header[0] += (unsigned char) in_header->ack * CMD_ACK;
-	out_header[0] += (unsigned char) (in_header->set * CMD_SET);
-	out_header[0] += (unsigned char) (in_header->del * CMD_DEL);
-	
+	out_header[0] = (out_header[0] & ~CMD_GET) | ((in_header->get * CMD_GET) & CMD_GET);
+	out_header[0] = (out_header[0] & ~CMD_ACK) | ((in_header->ack * CMD_ACK) & CMD_ACK);
+	out_header[0] = (out_header[0] & ~CMD_SET) | ((in_header->set * CMD_SET) & CMD_SET);
+	out_header[0] = (out_header[0] & ~CMD_DEL) | ((in_header->del * CMD_DEL) & CMD_DEL);
+
 	out_header[1] = (unsigned char) in_header->tid;
 	out_header[2] = (unsigned char) (in_header->k_l >> 8);
 	out_header[3] = (unsigned char) (in_header->k_l % 256);
@@ -53,10 +53,10 @@ void marshal(unsigned char *out_header, header_t *in_header) {
 		return;
 	}
 
-	out_header[0] += (unsigned char) (in_header->intl * CMD_INTL);
-	out_header[0] += (unsigned char) in_header->join * CMD_JOIN;
-	out_header[0] += (unsigned char) in_header->noti * CMD_NOTI;
-	out_header[0] += (unsigned char) in_header->stbz * CMD_STBZ;
+	out_header[0] = (out_header[0] & ~CMD_INTL) | ((in_header->intl * CMD_INTL) & CMD_INTL);
+	out_header[0] = (out_header[0] & ~CMD_JOIN) | ((in_header->join * CMD_JOIN) & CMD_JOIN);
+	out_header[0] = (out_header[0] & ~CMD_NOTI) | ((in_header->noti * CMD_NOTI) & CMD_NOTI);
+	out_header[0] = (out_header[0] & ~CMD_STBZ) | ((in_header->stbz * CMD_STBZ) & CMD_STBZ);
 
 	out_header[6] = (unsigned char) (in_header->id >> 8);
 	out_header[7] = (unsigned char) (in_header->id % 256);
