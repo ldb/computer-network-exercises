@@ -17,21 +17,21 @@
 #define HEADER_SIZE_INT 14
 #define HASH_SPACE 100
 
-char *SELF_IP;
-char *NEXT_IP;
-char *PREV_IP;
-char *SELF_PORT;
-char *NEXT_PORT;
-char *PREV_PORT;
-char *SELF_ID;
-char *NEXT_ID;
-char *PREV_ID;
+char *SELF_IP = NULL;
+char *NEXT_IP = NULL;
+char *PREV_IP = NULL;
+char *SELF_PORT = NULL;
+char *NEXT_PORT = NULL;
+char *PREV_PORT = NULL;
+char *SELF_ID = NULL;
+char *NEXT_ID = NULL;
+char *PREV_ID = NULL;
 int CLIENT_SOCKET; // Save socket information of client
 
 int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket) {
 	printf("[%s] request from peer %s\n", SELF_ID, NEXT_ID);
 
-	if (incoming_header->intl == 0) {
+	if (!incoming_header->intl) {
 		outgoing_header->id = atoi(SELF_ID);
 		outgoing_header->port = atoi(SELF_PORT);
 		outgoing_header->ip = atoi(SELF_IP);
@@ -43,6 +43,9 @@ int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, ch
 	}
 
 	outgoing_header->intl = 1;
+	outgoing_header->join = incoming_header->join;
+	incoming_header->noti = incoming_header->noti;
+	incoming_header->stbz = incoming_header->stbz;
 	outgoing_header->ack = 0;
 	outgoing_header->set = incoming_header->set;
 	outgoing_header->get = incoming_header->get;
@@ -215,9 +218,21 @@ int respondToClient(header_t *outgoing_header, header_t *incoming_header, char *
 	return 0;
 }
 
+int join(char *peerID, char *peerIP, char *peerPort) {
+	return 0;
+}
+
+int notify(char *peerID, char *peerIP, char *peerPort) {
+	return 0;
+}
+
+int stabilize(char *peerID, char *peerIP, char *peerPort) {
+	return 0;
+}
+
 int main(int argc, char *argv[]) {
 	if (argc != 8) {
-		fprintf(stderr, "arguments: port, id, previous port, previous id, next port, next id, ip-adress\n");
+		fprintf(stderr, "arguments: SELF_ID, SELF_IP, SELF_PORT [, PEER_IP, PEER_PORT]\n");
 		return 1;
 	}
 
@@ -230,6 +245,15 @@ int main(int argc, char *argv[]) {
 	SELF_IP = argv[7];
 	NEXT_IP = argv[7];
 	PREV_IP = argv[7];
+
+	if (!NEXT_ID) {
+		NEXT_ID = SELF_ID;
+		PREV_ID = SELF_ID;
+		NEXT_IP = SELF_IP;
+		PREV_IP = SELF_IP;
+		NEXT_PORT = SELF_PORT;
+		PREV_PORT = SELF_PORT;
+	}
 
 	struct addrinfo hints, *res;
 	int status;
@@ -346,7 +370,7 @@ int main(int argc, char *argv[]) {
 
 			respondToClient(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 
-		} else if ((key_hash > atoi(NEXT_ID)) && atoi(NEXT_ID) > atoi(SELF_ID)) {
+		} else if (key_hash > atoi(SELF_ID) && atoi(SELF_ID) > atoi(PREV_ID)) {
 
 			requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 
@@ -378,6 +402,9 @@ int main(int argc, char *argv[]) {
 			}
 
 			if (incoming_header.intl && incoming_header.join) {
+				if (key_hash > atoi(SELF_ID) && atoi(SELF_ID) > atoi(PREV_ID)) {
+					requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
+				}
 
 			}
 
@@ -392,7 +419,7 @@ int main(int argc, char *argv[]) {
 			outgoing_header->ack = 1;
 			outgoing_header->tid = incoming_header.tid;
 
-			if (incoming_header.intl == 1) {
+			if (incoming_header.intl) {
 				respondToPeer(outgoing_header, &incoming_header, key_buffer, value_buffer);
 			} else {
 				respondToClient(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
