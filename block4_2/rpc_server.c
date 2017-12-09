@@ -28,6 +28,25 @@ char *NEXT_ID = NULL;
 char *PREV_ID = NULL;
 int CLIENT_SOCKET; // Save socket information of client
 
+int sendData(int socked, char *buffer, int length) {
+	int to_send = length;
+
+	do {
+		int sent;
+		if ((sent = send(socked, buffer, to_send, 0)) == -1) {
+			fprintf(stderr, "[%s][send]: %s\n", SELF_ID, strerror(errno));
+			return 2;
+		}
+
+		printf("[%s] sent %d bytes\n", SELF_ID, sent);
+
+		to_send -= sent;
+		buffer += sent;
+	} while (0 < to_send);
+	buffer -= length;
+	return 0;
+}
+
 int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket) {
 	printf("[%s] request from peer %s\n", SELF_ID, NEXT_ID);
 
@@ -84,21 +103,7 @@ int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, ch
 		return 2;
 	}
 
-	int to_send = final_size;
-
-	do {
-		int sent;
-		if ((sent = send(sockfd, outbuffer, to_send, 0)) == -1) {
-			fprintf(stderr, "[%s][send] %s\n", SELF_ID, strerror(errno));
-			return 2;
-		}
-
-		printf("[%s] sent %d bytes\n", SELF_ID, sent);
-
-		to_send -= sent;
-		outbuffer += sent;
-	} while (0 < to_send);
-	outbuffer -= final_size;
+	sendData(sockfd, outbuffer, final_size);
 
 	//free(outbuffer);
 
@@ -144,21 +149,7 @@ int respondToPeer(header_t *outgoing_header, header_t *incoming_header, char *ke
 		return 2;
 	}
 
-	int to_send = final_size;
-
-	do {
-		int sent;
-		if ((sent = send(sockfd, outbuffer, to_send, 0)) == -1) {
-			fprintf(stderr, "[%s][send]: %s\n", SELF_ID, strerror(errno));
-			return 2;
-		}
-
-		printf("[%s] sent %d bytes\n", SELF_ID, sent);
-
-		to_send -= sent;
-		outbuffer += sent;
-	} while (0 < to_send);
-	outbuffer -= final_size;
+	sendData(sockfd, outbuffer, final_size);
 
 	//free(outbuffer);
 
@@ -190,27 +181,14 @@ int respondToClient(header_t *outgoing_header, header_t *incoming_header, char *
 	memcpy(outbuffer + HEADER_SIZE_EXT, key_buffer, outgoing_header->k_l);
 	memcpy(outbuffer + HEADER_SIZE_EXT + outgoing_header->k_l, value_buffer, outgoing_header->v_l);
 
-	int to_send = final_size;
 
-	if (CLIENT_SOCKET != 0) {
-		do {
-			int sent = send(CLIENT_SOCKET, outbuffer, to_send, 0);
-			to_send -= sent;
-			outbuffer += sent;
-		} while (to_send > 0);
-		outbuffer -= final_size;
+	if (CLIENT_SOCKET) {
+		sendData(CLIENT_SOCKET, outbuffer, final_size);
 		close(CLIENT_SOCKET);
+	} else {
+		sendData(temp_socket, outbuffer, final_size);
+		close(temp_socket);
 	}
-	else {
-		do {
-			int sent = send(temp_socket, outbuffer, to_send, 0);
-			to_send -= sent;
-			outbuffer += sent;
-		} while (to_send > 0);
-		outbuffer -= final_size;
-	}
-
-	close(temp_socket);
 
 	//free(outbuffer);
 
