@@ -16,7 +16,6 @@
 #define HEADER_SIZE_EXT 6
 #define HEADER_SIZE_INT 14
 #define HASH_SPACE 100
-#define SELF_HASH_SPACE 25
 
 char *SELF_IP;
 char *NEXT_IP;
@@ -235,7 +234,7 @@ int main(int argc, char *argv[]) {
 	struct addrinfo hints, *res;
 	int status;
 
-	init(SELF_HASH_SPACE); // Initialize Hashtagble of size 25 (1TABLESIZE divided by 4 because we have 4 peers)
+	init(HASH_SPACE); // Initialize Hashtagble of size 25 (1TABLESIZE divided by 4 because we have 4 peers)
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC; // Do not specify IPv4 or IPv6 explicitely
@@ -301,7 +300,6 @@ int main(int argc, char *argv[]) {
 
 			if (thrice == 0) {
 				unmarshal(&incoming_header, &request_header[0]);
-				printBinary(&request_header[0], HEADER_SIZE_EXT);
 				read = 0;
 
 				if (incoming_header.intl == 1) {
@@ -323,7 +321,6 @@ int main(int argc, char *argv[]) {
 				request_ptr = key_buffer = malloc(read_size);
 				thrice++;
 				read = 0;
-				//printHeader(&incoming_header);
 
 				continue;
 			}
@@ -342,12 +339,17 @@ int main(int argc, char *argv[]) {
 		header_t *outgoing_header = (header_t*) malloc(sizeof(header_t));
 		memset(outgoing_header, 0, sizeof(header_t));
 		int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
+		printf("[%s][hash] Key hash: %d\n", SELF_ID, key_hash);
 
 		// Operation was already completed by other peer, we should respond to client
-		if (incoming_header.intl == 1 && incoming_header.ack == 1) {
+		if (incoming_header.intl && incoming_header.ack) {
+
 			respondToClient(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
-		} else if (key_hash > (atoi(SELF_ID) + SELF_HASH_SPACE)) {
+
+		} else if ((key_hash > atoi(NEXT_ID)) && atoi(NEXT_ID) > atoi(SELF_ID)) {
+
 			requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
+
 		} else {
 			if (incoming_header.set) {
 				printf("[%s][recv] Received SET Command\n", SELF_ID);
@@ -373,6 +375,18 @@ int main(int argc, char *argv[]) {
 				printf("[%s][recv] Received DEL Command\n", SELF_ID);
 				outgoing_header->del = del(key_buffer, incoming_header.k_l);
 				outgoing_header->k_l = outgoing_header->v_l = 0;
+			}
+
+			if (incoming_header.intl && incoming_header.join) {
+
+			}
+
+			if (incoming_header.intl && incoming_header.noti) {
+
+			}
+
+			if (incoming_header.intl && incoming_header.stbz) {
+
 			}
 
 			outgoing_header->ack = 1;
