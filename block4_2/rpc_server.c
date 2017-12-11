@@ -406,7 +406,7 @@ int main(int argc, char *argv[]) {
 		return 2;
 	}
 
-	if ((listen(sockfd, 2)) == -1) {
+	if ((listen(sockfd, 5)) == -1) {
 		fprintf(stderr, "![%s][main][listen]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
@@ -427,6 +427,7 @@ int main(int argc, char *argv[]) {
 		if ((cnt % STBZ_INTERVAL == 0) && atoi(SELF_ID) != atoi(NEXT_ID)) {
 			printf("[%s] Sending STABILIZE to %s\n", SELF_ID, NEXT_ID);
 			stabilize();
+			sleep(1);
 			continue;
 		}
 
@@ -563,7 +564,7 @@ int main(int argc, char *argv[]) {
 				int temp_next = atoi(SELF_ID) < atoi(NEXT_ID) ? atoi(NEXT_ID) : atoi(NEXT_ID) + HASH_SPACE;
 				if (atoi(SELF_ID) != atoi(NEXT_ID) && ((incoming_header.id > atoi(SELF_ID) && incoming_header.id < temp_next) || (incoming_header.id < atoi(PREV_ID) && incoming_header.id < atoi(SELF_ID)))) {
 					printf("[%s][main][recv] Forward JOIN Command\n", SELF_ID);
-					//requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
+					requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 				} else {
 					*PREV_IP = (char)incoming_header.ip;
 					snprintf(PREV_ID, sizeof(PREV_ID), "%d", incoming_header.id);
