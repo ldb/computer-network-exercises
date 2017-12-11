@@ -16,7 +16,7 @@
 #define HEADER_SIZE_EXT 6
 #define HEADER_SIZE_INT 14
 #define HASH_SPACE 100
-#define STBZ_INTERVAL 3
+#define STBZ_INTERVAL 5
 
 char *SELF_IP;
 char *NEXT_IP;
@@ -35,7 +35,7 @@ int sendData(int socked, char *buffer, int length) {
 	do {
 		int sent;
 		if ((sent = send(socked, buffer, to_send, 0)) == -1) {
-			fprintf(stderr, "[%s][sendData][send]: %s\n", SELF_ID, strerror(errno));
+			fprintf(stderr, "![%s][sendData][send]: %s\n", SELF_ID, strerror(errno));
 			return 2;
 		}
 
@@ -114,14 +114,14 @@ int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, ch
 	hints.ai_socktype = SOCK_STREAM;
 
 	if ((status = getaddrinfo(NEXT_IP, NEXT_PORT, &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][requestFromNextPeer][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+		fprintf(stderr, "![%s][requestFromNextPeer][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
-		fprintf(stderr, "[%s][requestFromNextPeer][connect]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "![%s][requestFromNextPeer][connect]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
@@ -163,14 +163,14 @@ int respondToPeer(header_t *outgoing_header, header_t *incoming_header, char *ke
 	snprintf(tmp_PORT, sizeof(tmp_PORT), "%d", incoming_header->port);
 
 	if ((status = getaddrinfo(SELF_IP, &tmp_PORT[0], &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][respondToPeer][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+		fprintf(stderr, "![%s][respondToPeer][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
-		fprintf(stderr, "[%s][respondToPeer][connect]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "![%s][respondToPeer][connect]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
@@ -247,14 +247,14 @@ int join() {
 	hints.ai_socktype = SOCK_STREAM;
 
 	if ((status = getaddrinfo(NEXT_IP, NEXT_PORT, &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][join][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+		fprintf(stderr, "![%s][join][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
-		fprintf(stderr, "[%s][join][connect]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "![%s][join][connect]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
@@ -264,15 +264,15 @@ int join() {
 
 }
 
-int notify() {
+int notify(char *rcIP, char *rcPORT, char *ID, char *IP, char *PORT) {
 	header_t *request_header = (header_t*) malloc(sizeof(header_t));
 	memset(request_header, 0, sizeof(header_t));
 
 	request_header->intl = 1;
 	request_header->noti = 1;
-	request_header->id = atoi(SELF_ID);
-	request_header->ip = atoi(SELF_IP);
-	request_header->port = atoi(SELF_PORT);
+	request_header->id = atoi(ID);
+	request_header->ip = atoi(IP);
+	request_header->port = atoi(PORT);
 
 	unsigned char h[HEADER_SIZE_INT];
 	unsigned char *out_header = h;
@@ -287,15 +287,15 @@ int notify() {
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 
-	if ((status = getaddrinfo(PREV_IP, PREV_PORT, &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][notify][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+	if ((status = getaddrinfo(rcIP, rcPORT, &hints, &res)) != 0) {
+		fprintf(stderr, "![%s][notify][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
-		fprintf(stderr, "[%s][notify][connect]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "![%s][notify][connect]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
@@ -328,14 +328,14 @@ int stabilize() {
 	hints.ai_socktype = SOCK_STREAM;
 
 	if ((status = getaddrinfo(NEXT_IP, NEXT_PORT, &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][stabilize][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+		fprintf(stderr, "![%s][stabilize][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
-		fprintf(stderr, "[%s][stabilize][connect]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "![%s][stabilize][connect]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
@@ -379,15 +379,15 @@ int main(int argc, char *argv[]) {
 	struct addrinfo hints, *res;
 	int status;
 
-	init(HASH_SPACE); // Initialize Hashtagble of size 25 (1TABLESIZE divided by 4 because we have 4 peers)
+	init(HASH_SPACE);
 
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC; // Do not specify IPv4 or IPv6 explicitely
-	hints.ai_socktype = SOCK_STREAM; // Streaming socket protocol
-	hints.ai_flags = AI_PASSIVE; // Use default local adress
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
 
 	if ((status = getaddrinfo(NULL, SELF_PORT, &hints, &res)) != 0) {
-		fprintf(stderr, "[%s][main][getaddrinfo]: %s\n", SELF_ID, strerror(status));
+		fprintf(stderr, "![%s][main][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
 
@@ -396,17 +396,17 @@ int main(int argc, char *argv[]) {
 	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
 	if ((sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1) {
-		fprintf(stderr, "[%s][main][socket]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "![%s][main][socket]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
 	if ((bind(sockfd, res->ai_addr, res->ai_addrlen)) != 0) {
-		fprintf(stderr, "[%s][main][bind]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "![%s][main][bind]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
 	if ((listen(sockfd, 1)) == -1) {
-		fprintf(stderr, "[%s][main][listen]: %s\n", SELF_ID, strerror(errno));
+		fprintf(stderr, "![%s][main][listen]: %s\n", SELF_ID, strerror(errno));
 		return 2;
 	}
 
@@ -419,18 +419,28 @@ int main(int argc, char *argv[]) {
 
 	int cnt = 1;
 	int firstSet = 0;
+
+	// fd_set readset;
+	// FD_ZERO(&readset);
+	// struct timeval tv;
+	// tv.tv_sec = 5;
+
 	while (1) {
 		cnt++;
 
-		if (cnt % STBZ_INTERVAL == 0 && atoi(SELF_ID) != atoi(NEXT_ID)) {
-			printf("[%s] Sending STABILIZE to %s\n", SELF_ID, NEXT_ID);
+		//FD_SET(sockfd, &readset);
 
-			// if (!PREV_ID) {
-			// 	PREV_ID = strdup(NEXT_ID);
-			// }
+    	//select(sockfd + 1, &readset, NULL, NULL, &tv);
 
-			stabilize();
-			//continue;
+		if (atoi(SELF_ID) != atoi(NEXT_ID)) {
+		printf("[%s] Sending STABILIZE to %s\n", SELF_ID, NEXT_ID);
+
+		// 	// if (!PREV_ID) {
+		// 	// 	PREV_ID = strdup(NEXT_ID);
+		// 	// }
+		//sleep(rand() % );
+		stabilize();
+		//continue;
 		}
 
 		// if (atoi(SELF_ID) != atoi(PREV_ID) && atoi(SELF_ID) == atoi(NEXT_ID)) {
@@ -466,7 +476,7 @@ int main(int argc, char *argv[]) {
 
 		do {
 			if ((rs = recv(temp_socket, request_ptr, read_size, 0)) < 0) {
-				fprintf(stderr, "recv: %s\n", strerror(errno));
+				fprintf(stderr, "![%s][main][recv]: %s\n", SELF_ID, strerror(errno));
 				return 2;
 			}
 			read += rs;
@@ -560,7 +570,8 @@ int main(int argc, char *argv[]) {
 			if (incoming_header.intl && incoming_header.join) {
 				printf("[%s][main][recv] Received JOIN Command\n", SELF_ID);
 
-				if (incoming_header.id > atoi(SELF_ID) && PREV_ID && atoi(SELF_ID) > atoi(PREV_ID)) {
+				int temp_next = atoi(SELF_ID) < atoi(NEXT_ID) ? atoi(NEXT_ID) : atoi(NEXT_ID) + HASH_SPACE;
+				if (atoi(SELF_ID) != atoi(NEXT_ID) && ((incoming_header.id > atoi(SELF_ID) && incoming_header.id < temp_next) || (incoming_header.id < atoi(PREV_ID) && incoming_header.id < atoi(SELF_ID)))) {
 					printf("[%s][main][recv] Forward JOIN Command\n", SELF_ID);
 					//requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 				} else {
@@ -575,8 +586,7 @@ int main(int argc, char *argv[]) {
 						snprintf(NEXT_PORT, sizeof(NEXT_PORT), "%d", incoming_header.port);
 						printf("[%s][recv][join] Also updated NEXT: %s\n", SELF_ID, NEXT_ID);
 					}
-					notify();
-
+					notify(PREV_IP, PREV_PORT, PREV_ID, PREV_IP, PREV_PORT);
 				}
 				close(temp_socket);
 				//printf("[%s][recv][join] Closed connection\n", SELF_ID);
@@ -593,10 +603,10 @@ int main(int argc, char *argv[]) {
 					printf("[%s][recv][noti] Updated NEXT: %s\n", SELF_ID, NEXT_ID);
 				}
 
-				if (PREV_ID) {
-					notify();
-					printf("[%s][recv][noti] Sending NOTIFY to: %s\n", SELF_ID, PREV_ID);
-				}
+				// if (PREV_ID) {
+				// 	//notify();
+				// 	printf("[%s][recv][noti] Sending NOTIFY to: %s\n", SELF_ID, PREV_ID);
+				// }
 
 				close(temp_socket);
 				//printf("[%s][recv][noti] Closed connection\n", SELF_ID);
@@ -625,12 +635,21 @@ int main(int argc, char *argv[]) {
 					outgoing_header->port = atoi(PREV_PORT);
 					outgoing_header->noti = 1;
 					printf("[%s][recv][stbz] Responding with PREV %s\n", SELF_ID, PREV_ID);
-					respondToPeer(outgoing_header, &incoming_header, key_buffer, value_buffer);
+					//respondToPeer(outgoing_header, &incoming_header, key_buffer, value_buffer);
+
+					char *FROM_IP = strdup(SELF_IP);
+					char *FROM_PORT = strdup(SELF_PORT);
+
+					snprintf(FROM_IP, sizeof(FROM_IP), "%d", incoming_header.ip);
+					snprintf(FROM_PORT, sizeof(FROM_PORT), "%d", incoming_header.port);
+
+					//srand(time(NULL)); 
+					notify(FROM_IP,FROM_PORT,PREV_ID, PREV_IP, PREV_PORT);
 					close(temp_socket);
 					//	printf("[%s][recv][stbz] Closed connection\n", SELF_ID);
 					continue;
 				}
-
+				//stabilize();
 				//requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 			}
 			// if (incoming_header.intl) {
