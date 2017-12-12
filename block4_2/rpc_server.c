@@ -38,9 +38,6 @@ int sendData(int socked, char *buffer, int length) {
 			fprintf(stderr, "![%s][sendData][send]: %s\n", SELF_ID, strerror(errno));
 			return 2;
 		}
-
-		printf("[%s][sendData] sent %d bytes\n", SELF_ID, sent);
-
 		to_send -= sent;
 		buffer += sent;
 	} while (0 < to_send);
@@ -340,7 +337,7 @@ int stabilize() {
 	}
 
 	sendData(sockfd, (char*)out_header, HEADER_SIZE_INT);
-	printf("[%s] Closing STABILIZE socket\n", SELF_ID);
+	//printf("[%s] Closing STABILIZE socket\n", SELF_ID);
 	close(sockfd);
 	return 0;
 }
@@ -359,12 +356,6 @@ int main(int argc, char *argv[]) {
 		NEXT_ID = argv[4];
 		NEXT_IP = argv[5];
 		NEXT_PORT = argv[6];
-		// PREV_ID = strdup(argv[1]);
-		// PREV_IP = strdup(argv[2]);
-		// PREV_PORT = strdup(argv[3]);
-		// // memset(PREV_IP, 0, sizeof(*argv[2]));
-		// memset(PREV_ID, 0, sizeof(*PREV_ID));
-		// // memset(PREV_PORT, 0, sizeof(*argv[3]));
 	}
 
 	// We are alone :(
@@ -424,16 +415,12 @@ int main(int argc, char *argv[]) {
 	while (1) {
 		cnt++;
 
-		if ((cnt % STBZ_INTERVAL == 0) && atoi(SELF_ID) != atoi(NEXT_ID)) {
+		if ((cnt % STBZ_INTERVAL == 0) && atoi(SELF_ID) != atoi(NEXT_ID) && !firstSet) {
 			printf("[%s] Sending STABILIZE to %s\n", SELF_ID, NEXT_ID);
 			stabilize();
 			sleep(1);
 			continue;
 		}
-
-		// if (atoi(SELF_ID) != atoi(PREV_ID) && atoi(SELF_ID) == atoi(NEXT_ID)) {
-		// 	NEXT_ID = strdup(PREV_ID);
-		// }
 
 		printf("[%s] Tick: %d PREV: %s, NEXT: %s\n", SELF_ID, cnt, PREV_ID, NEXT_ID);
 
@@ -441,8 +428,6 @@ int main(int argc, char *argv[]) {
 		struct sockaddr_storage incoming_addr;
 		socklen_t addr_size = sizeof incoming_addr;
 		temp_socket = accept(sockfd, (struct sockaddr *) &incoming_addr, &addr_size);
-
-		//printf("[%s][main][acpt] New Connection\n", SELF_ID);
 
 		unsigned char request_header[HEADER_SIZE_INT];
 		char *request_ptr = (char *) request_header;
@@ -460,7 +445,6 @@ int main(int argc, char *argv[]) {
 
 		char *key_buffer = NULL;
 		char *value_buffer = NULL;
-		//printf("[%s][main][recv] Receiving Data\n", SELF_ID);
 
 		do {
 			if ((rs = recv(temp_socket, request_ptr, read_size, 0)) < 0) {
@@ -509,17 +493,28 @@ int main(int argc, char *argv[]) {
 
 		header_t *outgoing_header = (header_t*) malloc(sizeof(header_t));
 		memset(outgoing_header, 0, sizeof(header_t));
-		int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
-		//printf("[%s][main][hash] Key hash: %d\n", SELF_ID, key_hash);
 
-		if (key_hash > atoi(SELF_ID) && PREV_ID && atoi(SELF_ID) > atoi(PREV_ID)) {
-
-			//requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
-			//close(temp_socket);
-			//continue;
+		if (!firstSet && (incoming_header.set || incoming_header.get || incoming_header.del)) {
+			firstSet = 1;
 		}
 
-		if (firstSet && !incoming_header.intl) {
+		if (firstSet) {
+			// Operation was already completed by other peer, we should respond to client
+			if (incoming_header.intl && incoming_header.ack) {
+				respondToClient(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
+			}
+
+			int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
+			int temp_next = atoi(SELF_ID) < atoi(NEXT_ID) ? atoi(NEXT_ID) : atoi(NEXT_ID) + HASH_SPACE;
+			printf("[%s][main][hash] Key hash: %d\n", SELF_ID, key_hash);
+
+			if (atoi(SELF_ID) != atoi(NEXT_ID) && ((key_hash > atoi(SELF_ID) && key_hash < temp_next) || (key_hash < atoi(PREV_ID) && key_hash < atoi(SELF_ID)))) {
+				printf("[%s][main][recv] Forwarding to peer %s\n", SELF_ID, NEXT_ID);
+				requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
+				close(temp_socket);
+				continue;
+			}
+
 			if (incoming_header.set) {
 				printf("[%s][main][recv] Received SET Command\n", SELF_ID);
 				outgoing_header->set = set(key_buffer, value_buffer, (int)incoming_header.k_l, (int)incoming_header.v_l);
@@ -553,11 +548,6 @@ int main(int argc, char *argv[]) {
 			continue;
 
 		} else {
-			// Operation was already completed by other peer, we should respond to client
-			// if (incoming_header.intl && incoming_header.ack) {
-			// 	respondToClient(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
-			// }
-
 			if (incoming_header.intl && incoming_header.join) {
 				printf("[%s][main][recv] Received JOIN Command\n", SELF_ID);
 
@@ -580,7 +570,6 @@ int main(int argc, char *argv[]) {
 					notify(PREV_IP, PREV_PORT, PREV_ID, PREV_IP, PREV_PORT);
 				}
 				close(temp_socket);
-				//printf("[%s][recv][join] Closed connection\n", SELF_ID);
 				continue;
 			}
 
@@ -594,13 +583,7 @@ int main(int argc, char *argv[]) {
 					printf("[%s][recv][noti] Updated NEXT: %s\n", SELF_ID, NEXT_ID);
 				}
 
-				// if (PREV_ID) {
-				// 	//notify();
-				// 	printf("[%s][recv][noti] Sending NOTIFY to: %s\n", SELF_ID, PREV_ID);
-				// }
-
 				close(temp_socket);
-				//printf("[%s][recv][noti] Closed connection\n", SELF_ID);
 				continue;
 			}
 
@@ -626,7 +609,6 @@ int main(int argc, char *argv[]) {
 					outgoing_header->port = atoi(PREV_PORT);
 					outgoing_header->noti = 1;
 					printf("[%s][recv][stbz] Responding with PREV %s\n", SELF_ID, PREV_ID);
-					//respondToPeer(outgoing_header, &incoming_header, key_buffer, value_buffer);
 
 					char *FROM_IP = strdup(SELF_IP);
 					char *FROM_PORT = strdup(SELF_PORT);
@@ -634,15 +616,12 @@ int main(int argc, char *argv[]) {
 					snprintf(FROM_IP, sizeof(FROM_IP), "%d", incoming_header.ip);
 					snprintf(FROM_PORT, sizeof(FROM_PORT), "%d", incoming_header.port);
 
-					//srand(time(NULL));
 					notify(FROM_IP, FROM_PORT, PREV_ID, PREV_IP, PREV_PORT);
 					printf("[%s][recv][stbz] Notified peer %d\n", SELF_ID, incoming_header.id);
 					close(temp_socket);
-					//	printf("[%s][recv][stbz] Closed connection\n", SELF_ID);
 					continue;
 				}
 				//stabilize();
-				//requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 			}
 			// if (incoming_header.intl) {
 			// 	//respondToPeer(outgoing_header, &incoming_header, key_buffer, value_buffer);
