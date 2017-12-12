@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
 #include "hashtable.h"
 #include "rpc_server.h"
 #include "marshalling.h"
@@ -28,6 +29,7 @@ char *SELF_ID;
 char *NEXT_ID;
 char *PREV_ID;
 int CLIENT_SOCKET; // Save socket information of client
+int STILL_BUILDING;
 
 void printHeader(header_t *header){
 	printf("Set: %d\n", header->set);
@@ -85,7 +87,7 @@ header_t *receiveHeader(int socket) {
 int sendToNextPeer1(header_t *incoming_header){
 	unsigned char h[HEADER_SIZE_INL] = "00000000000000";
 	unsigned char *out_header = h;
-	memset(out_header, 0, sizeof(out_header));
+	memset(out_header, 0, sizeof(*out_header));
 	marshal(out_header, incoming_header);
 
 	struct addrinfo hints, *res;
@@ -118,7 +120,7 @@ int sendToNextPeer1(header_t *incoming_header){
 	return 0;
 }
 
-int stabilize(int ownSocket){
+int stabilize(){
 	header_t *outgoing_header = (header_t *) malloc(sizeof(header_t));
 	memset(outgoing_header, 0, sizeof(header_t));
 
@@ -160,32 +162,12 @@ int stabilize(int ownSocket){
 		return 2;
 	}
 
-	header_t *incoming_header = receiveHeader(sockfd);
-
-	printf("RECEIVED HEADER AFTER STABILIZE!\n");
-
-	if(incoming_header->id != atoi(SELF_ID)){
-		if(NEXT_ID == NULL){
-			NEXT_ID = malloc(sizeof(char) * 2);
-			NEXT_IP = malloc(sizeof(char) * 4);
-			NEXT_PORT = malloc(sizeof(char) * 2);
-		}
-		else{
-			memset(NEXT_ID, 0, sizeof(NEXT_ID));
-			memset(NEXT_IP, 0, sizeof(NEXT_IP));
-			memset(NEXT_PORT, 0, sizeof(NEXT_PORT));
-		}
-		sprintf(NEXT_ID, "%d", incoming_header->id);
-		sprintf(NEXT_IP, "%d", incoming_header->ip);
-		sprintf(NEXT_PORT, "%d", incoming_header->port);
-	}
-
 	close(sockfd);
  
 	return 0;
 }
 
-int notify(int socket, header_t *incoming_header){
+int notify(header_t *incoming_header){
 	header_t *outgoing_header = (header_t *) malloc(sizeof(header_t));
 	memset(outgoing_header, 0, sizeof(header_t));
 
@@ -193,31 +175,32 @@ int notify(int socket, header_t *incoming_header){
 		PREV_ID = malloc(sizeof(char) * 2);
 		PREV_IP = malloc(sizeof(char) * 4);
 		PREV_PORT = malloc(sizeof(char) * 2);
-		sprintf(PREV_ID, "%d", incoming_header->id);
-		sprintf(PREV_IP, "%d", incoming_header->ip);
-		sprintf(PREV_PORT, "%d", incoming_header->port);
+		snprintf(PREV_ID, 16, "%d", incoming_header->id);
+		snprintf(PREV_IP, 32, "%d", incoming_header->ip);
+		snprintf(PREV_PORT, 16, "%d", incoming_header->port);
 		if(NEXT_ID == NULL){
 			NEXT_ID = malloc(sizeof(char) * 2);
 			NEXT_IP = malloc(sizeof(char) * 4);
 			NEXT_PORT = malloc(sizeof(char) * 2);
-			sprintf(NEXT_ID, "%d", incoming_header->id);
-			sprintf(NEXT_IP, "%d", incoming_header->ip);
-			sprintf(NEXT_PORT, "%d", incoming_header->port);
+			snprintf(NEXT_ID, 16, "%d", incoming_header->id);
+			snprintf(NEXT_IP, 32, "%d", incoming_header->ip);
+			snprintf(NEXT_PORT, 16, "%d", incoming_header->port);
 		}
 	}
 	else if (atoi(PREV_ID) != incoming_header->id && incoming_header->joi == 1){
-		memset(PREV_ID, 0, sizeof(NEXT_ID));
-		memset(PREV_IP, 0, sizeof(NEXT_IP));
-		memset(PREV_PORT, 0, sizeof(NEXT_PORT));
-		sprintf(PREV_ID, "%d", incoming_header->id);
-		sprintf(PREV_IP, "%d", incoming_header->ip);
-		sprintf(PREV_PORT, "%d", incoming_header->port);
+		memset(PREV_ID, 0, sizeof(*PREV_ID));
+		memset(PREV_IP, 0, sizeof(*PREV_IP));
+		memset(PREV_PORT, 0, sizeof(*PREV_PORT));
+		snprintf(PREV_ID, 16, "%d", incoming_header->id);
+		snprintf(PREV_IP, 32, "%d", incoming_header->ip);
+		snprintf(PREV_PORT, 16, "%d", incoming_header->port);
 	}
 
 	if(incoming_header->joi == 1){
 		outgoing_header->inl = 1;
 		outgoing_header->noy = 1;
 		outgoing_header->stb = 0;
+		outgoing_header->joi = 0;
 		outgoing_header->id = atoi(SELF_ID);
 		outgoing_header->ip = atoi(SELF_IP);
 		outgoing_header->port = atoi(SELF_PORT);
@@ -225,6 +208,7 @@ int notify(int socket, header_t *incoming_header){
 	else if (incoming_header->stb == 1){
 		outgoing_header->inl = 1;
 		outgoing_header->noy = 1;
+		outgoing_header->stb = 0;
 		outgoing_header->id = atoi(PREV_ID);
 		outgoing_header->ip = atoi(PREV_IP);
 		outgoing_header->port = atoi(PREV_PORT);
@@ -241,15 +225,40 @@ int notify(int socket, header_t *incoming_header){
 	marshal(out_header, outgoing_header);
 
 	size_t final_size = HEADER_SIZE_INL;
-	char *outbuffer = malloc(final_size);
+	unsigned char *outbuffer = malloc(final_size);
 
 	memcpy(outbuffer, out_header, HEADER_SIZE_INL);
+
+	struct addrinfo hints, *res;
+	int status;
+
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+
+	char tmp_IP[4];
+	char tmp_PORT[2];
+
+	snprintf(tmp_IP, 32, "%d", incoming_header->id);
+	snprintf(tmp_PORT, 16, "%d", incoming_header->port);
+
+	if((status = getaddrinfo(tmp_IP, tmp_PORT, &hints, &res)) != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", strerror(status));
+		return 2;
+	}
+
+	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	
+	if(connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
+		fprintf(stderr, "connect: %s\n", strerror(errno));
+		return 2;
+	}
 
 	int to_send = final_size;
 
 	do {
 		int sent;
-		if ((sent = send(socket, outbuffer, to_send, 0)) == -1) {
+		if ((sent = send(sockfd, outbuffer, to_send, 0)) == -1) {
 			fprintf(stderr, "[%s][send] %s\n", SELF_ID, strerror(errno));
 			return 2;
 		}
@@ -263,7 +272,7 @@ int notify(int socket, header_t *incoming_header){
 
 	free(outgoing_header);
 	free(outbuffer);
-	close(socket);
+	close(sockfd);
 
 	return 0;
 }
@@ -313,24 +322,20 @@ int join(char *IpToCall, char *PortToCall){
 
 	printf("[i] Sent %d bytes\n", sent);
 
-	header_t *incoming_header = receiveHeader(sockfd);
-
-	if (NEXT_ID == NULL){
-		NEXT_ID = malloc(sizeof(char) * 2);
-		NEXT_IP = malloc(sizeof(char) * 4);
-		NEXT_PORT = malloc(sizeof(char) * 2);
-		sprintf(NEXT_ID, "%d", incoming_header->id);
-		sprintf(NEXT_IP, "%d", incoming_header->ip);
-		sprintf(NEXT_PORT, "%d", incoming_header->port);
-	}
-
-	printf("MEINE DATEN ALS NODE NUMMER %s:\n", SELF_ID);
-	printf("NEXT_ID: %s\tNEXT_PORT: %s\n", NEXT_ID, NEXT_PORT);
-	printf("PREV_ID: %s\tPREV_PORT: %s\n", PREV_ID, PREV_PORT);
-
 	close(sockfd);
 
 	return 0;
+}
+
+void *thread(void *arg){
+	while(STILL_BUILDING == 1){
+		sleep(2);
+		if(NEXT_ID != NULL){
+			stabilize();
+		}
+	}
+
+	return NULL;
 }
 
 int main(int argc, char *argv[]){
@@ -403,93 +408,89 @@ int main(int argc, char *argv[]){
 		return 2;
 	}
 
-	if(argc == 3 || argc == 4){
-		CLIENT_SOCKET = sockfd;
-	}
-
 	printf("Created my own Socket on Peer Number %s!\n", SELF_ID);
 	fd_set readset;
 	FD_ZERO(&readset);
-	struct timeval tv;
-	tv.tv_sec = 1;
-	tv.tv_usec = 200000;
+	//struct timeval tv;
+	//tv.tv_sec = 2;
+	//tv.tv_usec = 0;
+	STILL_BUILDING = 1;
+	pthread_t pt;
+	pthread_create(&pt, NULL, thread, NULL);
 
 	while (1) {
 		int temp_socket;
 		struct sockaddr_storage incoming_addr;
 		socklen_t addr_size = sizeof incoming_addr;
 		 
-    	FD_SET(sockfd, &readset);
+		temp_socket = accept(sockfd, (struct sockaddr *) &incoming_addr, &addr_size);
+		printf("[%s][acpt] New Connection\n", SELF_ID);
 
-    	select(sockfd + 1, &readset, NULL, NULL, &tv);
+		header_t *incoming_header = receiveHeader(temp_socket);
 
-    	if(!FD_ISSET(sockfd, &readset) && NEXT_ID != NULL){
-    		stabilize(sockfd);
-    		tv.tv_sec++;
-    	}
-    	else if (FD_ISSET(sockfd, &readset)){
-			temp_socket = accept(sockfd, (struct sockaddr *) &incoming_addr, &addr_size);
-			printf("[%s][acpt] New Connection\n", SELF_ID);
+		printf("received Header:\n");
+		printHeader(incoming_header);
 
-			header_t *incoming_header = receiveHeader(temp_socket);
+		header_t *outgoing_header = (header_t*) malloc(sizeof(header_t));
+		memset(outgoing_header, 0, sizeof(header_t));
 
-			printf("received Header:\n");
-			printHeader(incoming_header);
-
-			header_t *outgoing_header = (header_t*) malloc(sizeof(header_t));
-			memset(outgoing_header, 0, sizeof(header_t));
-
-			// Operation was already completed by other peer, we should respond to client
-			if (incoming_header->stb == 1){
-				printf("received Stabilize!\n");
-				notify(temp_socket, incoming_header);
-			}
-			else if (incoming_header->noy == 1){
-				printf("received Notify!\n");
-				if(incoming_header->id != atoi(SELF_ID)){
-					if(NEXT_ID == NULL){
-						NEXT_ID = malloc(sizeof(char) * 2);
-						NEXT_IP = malloc(sizeof(char) * 4);
-						NEXT_PORT = malloc(sizeof(char) * 2);
-					}
-					else{
-						memset(NEXT_ID, 0, sizeof(NEXT_ID));
-						memset(NEXT_IP, 0, sizeof(NEXT_IP));
-						memset(NEXT_PORT, 0, sizeof(NEXT_PORT));
-					}
-					sprintf(NEXT_ID, "%d", incoming_header->id);
-					sprintf(NEXT_IP, "%d", incoming_header->ip);
-					sprintf(NEXT_PORT, "%d", incoming_header->port);
-				}
-			}
-			else if (incoming_header->joi == 1){
-				printf("received Join\n");
-				if(NEXT_ID != NULL && PREV_ID != NULL){
-					if(atoi(PREV_ID) > atoi(SELF_ID)){
-						// forward
-					}
-					//sendToNextPeer1(incoming_header);
-				}
-				else {
-					notify(temp_socket, incoming_header);
-				}
-				tv.tv_sec = 1;
-			}
-			else if (incoming_header->set == 1){
-
-			}
-
-			close(temp_socket);
-			FD_CLR(sockfd, &readset);
-			printf("[%s][send] Closed connection\n", SELF_ID);
-
-			printf("MEINE DATEN ALS NODE NUMMER %s:\n", SELF_ID);
-			printf("NEXT_ID: %s\tNEXT_PORT: %s\n", NEXT_ID, NEXT_PORT);
-			printf("PREV_ID: %s\tPREV_PORT: %s\n", PREV_ID, PREV_PORT);
-
-			memset(&incoming_header, 0, sizeof incoming_header);
-			memset(&outgoing_header, 0, sizeof outgoing_header);
+		// Operation was already completed by other peer, we should respond to client
+		if (incoming_header->stb == 1){
+			printf("received Stabilize!\n");
+			notify(incoming_header);
 		}
+		else if (incoming_header->noy == 1){
+			printf("received Notify!\n");
+			if(NEXT_ID == NULL){
+				NEXT_ID = malloc(sizeof(char) * 2);
+				NEXT_IP = malloc(sizeof(char) * 4);
+				NEXT_PORT = malloc(sizeof(char) * 2);
+				snprintf(NEXT_ID, 16, "%d", incoming_header->id);
+				snprintf(NEXT_IP, 32, "%d", incoming_header->ip);
+				snprintf(NEXT_PORT, 16, "%d", incoming_header->port);
+			}
+			else if(incoming_header->id != atoi(SELF_ID)){
+				memset(NEXT_ID, 0, sizeof(*NEXT_ID));
+				memset(NEXT_IP, 0, sizeof(*NEXT_IP));
+				memset(NEXT_PORT, 0, sizeof(*NEXT_PORT));
+				snprintf(NEXT_ID, 16, "%d", incoming_header->id);
+				snprintf(NEXT_IP, 32, "%d", incoming_header->ip);
+				snprintf(NEXT_PORT, 16, "%d", incoming_header->port);
+			}
+		}
+		else if (incoming_header->joi == 1){
+			printf("received Join\n");
+			if(NEXT_ID != NULL && PREV_ID != NULL && atoi(PREV_ID) > atoi(SELF_ID)){
+				if(incoming_header->id < atoi(PREV_ID) && incoming_header->id > atoi(SELF_ID)){
+					sendToNextPeer1(incoming_header);
+				}
+				else{
+					notify(incoming_header);
+				}
+				//sendToNextPeer1(incoming_header);
+			}
+			else if(NEXT_ID != NULL && incoming_header->id > atoi(SELF_ID)){
+				sendToNextPeer1(incoming_header);
+			}
+			else {
+				notify(incoming_header);
+			}
+		}
+		else if (incoming_header->set == 1){
+			STILL_BUILDING = 0;
+		}
+
+		close(temp_socket);
+		printf("[%s][send] Closed connection\n", SELF_ID);
+
+		printf("MEINE DATEN ALS NODE NUMMER %s:\n", SELF_ID);
+		printf("NEXT_ID: %s\tNEXT_PORT: %s\n", NEXT_ID, NEXT_PORT);
+		printf("PREV_ID: %s\tPREV_PORT: %s\n", PREV_ID, PREV_PORT);
+
+		memset(&incoming_header, 0, sizeof incoming_header);
+		memset(&outgoing_header, 0, sizeof outgoing_header);
+			
+		
 	}
 
 	close(sockfd);
