@@ -550,7 +550,6 @@ int main(int argc, char *argv[]) {
 				printf("\x1b[%dm[%s][main][recv] Received NOTIFY Command\x1b[0m\n", COLOR, SELF_ID);
 
 				if (incoming_header.id != atoi(SELF_ID)) {
-					//*NEXT_IP = (char)incoming_header.ip;
 					snprintf(NEXT_IP, sizeof(NEXT_IP), "%d", incoming_header.ip);
 					snprintf(NEXT_ID, sizeof(NEXT_ID), "%d", incoming_header.id);
 					snprintf(NEXT_PORT, sizeof(NEXT_PORT), "%d", incoming_header.port);
@@ -570,7 +569,6 @@ int main(int argc, char *argv[]) {
 					PREV_ID = strdup(SELF_ID);
 					PREV_PORT = strdup(SELF_PORT);
 
-					//*PREV_IP = (char)incoming_header.ip;
 					snprintf(PREV_IP, sizeof(PREV_IP), "%d", incoming_header.ip);
 					snprintf(PREV_ID, sizeof(PREV_ID), "%d", incoming_header.id);
 					snprintf(PREV_PORT, sizeof(PREV_PORT), "%d", incoming_header.port);
