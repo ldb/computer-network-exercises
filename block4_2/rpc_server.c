@@ -28,6 +28,11 @@ char *SELF_ID;
 char *NEXT_ID;
 char *PREV_ID;
 int CLIENT_SOCKET; // Save socket information of client
+int COLOR;
+
+int colorCode(int id) {
+	return (id % 6) + 31;
+}
 
 int sendData(int socked, char *buffer, int length) {
 	int to_send = length;
@@ -48,24 +53,6 @@ int sendData(int socked, char *buffer, int length) {
 int pass(int key) {
 	int temp_self = atoi(SELF_ID) > atoi(PREV_ID) ? atoi(SELF_ID) : atoi(SELF_ID) + HASH_SPACE;
 	return (key <= temp_self && key > atoi(PREV_ID)) || (temp_self > HASH_SPACE && (key >= 0 && key <= atoi(SELF_ID))) ? 0 : 1;
-}
-
-int prepareBuffer(char **outbuffer, header_t *outgoing_header, int headerSize, char *key_buffer, char *value_buffer) {
-
-	unsigned char h[headerSize];
-	unsigned char *out_header = h;
-	memset(&out_header, 0, headerSize);
-
-	marshal(out_header, outgoing_header);
-
-	size_t final_size = outgoing_header->k_l + outgoing_header->v_l + HEADER_SIZE_INT;
-	*outbuffer = malloc(final_size);
-
-	memcpy(outbuffer, out_header, HEADER_SIZE_INT);
-	memcpy(outbuffer + HEADER_SIZE_INT, key_buffer, outgoing_header->k_l);
-	memcpy(outbuffer + HEADER_SIZE_INT + outgoing_header->k_l, value_buffer, outgoing_header->v_l);
-
-	return final_size;
 }
 
 int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket) {
@@ -103,9 +90,6 @@ int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, ch
 	memcpy(outbuffer + HEADER_SIZE_INT, key_buffer, outgoing_header->k_l);
 	memcpy(outbuffer + HEADER_SIZE_INT + outgoing_header->k_l, value_buffer, outgoing_header->v_l);
 
-	// char *outbuffer = NULL;
-	// int final_size = prepareBuffer(*(outbuffer), outgoing_header, HEADER_SIZE_INT, key_buffer, value_buffer);
-
 	struct addrinfo hints, *res;
 	int status;
 
@@ -126,18 +110,12 @@ int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, ch
 	}
 
 	sendData(sockfd, outbuffer, final_size);
-
-	//free(outbuffer);
-
 	return 0;
 }
 
 int respondToPeer(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer) {
-	printf("[%s] respond to peer %d\n", SELF_ID, incoming_header->id);
-
 	outgoing_header->intl = 1;
 	outgoing_header->tid = incoming_header->tid;
-	//outgoing_header->ack = 1;
 
 	unsigned char h[HEADER_SIZE_INT] = "00000000000000";
 	unsigned char *out_header = h;
@@ -149,9 +127,6 @@ int respondToPeer(header_t *outgoing_header, header_t *incoming_header, char *ke
 	memcpy(outbuffer, out_header, HEADER_SIZE_INT);
 	memcpy(outbuffer + HEADER_SIZE_INT, key_buffer, outgoing_header->k_l);
 	memcpy(outbuffer + HEADER_SIZE_INT + outgoing_header->k_l, value_buffer, outgoing_header->v_l);
-
-	// char *outbuffer = NULL;
-	// int final_size = prepareBuffer(*(outbuffer), outgoing_header, HEADER_SIZE_INT, key_buffer, value_buffer);
 
 	struct addrinfo hints, *res;
 	int status;
@@ -178,17 +153,11 @@ int respondToPeer(header_t *outgoing_header, header_t *incoming_header, char *ke
 	}
 
 	sendData(sockfd, outbuffer, final_size);
-
-	//free(outbuffer);
-
 	close(sockfd);
-
 	return 0;
 }
 
 int respondToClient(header_t *outgoing_header, header_t *incoming_header, char *key_buffer, char *value_buffer, int temp_socket) {
-	printf("[%s] respond to client\n", SELF_ID);
-
 	if (incoming_header->intl && incoming_header->v_l) {
 		outgoing_header->get = 1;
 		outgoing_header->v_l = incoming_header->v_l;
@@ -209,9 +178,6 @@ int respondToClient(header_t *outgoing_header, header_t *incoming_header, char *
 	memcpy(outbuffer + HEADER_SIZE_EXT, key_buffer, outgoing_header->k_l);
 	memcpy(outbuffer + HEADER_SIZE_EXT + outgoing_header->k_l, value_buffer, outgoing_header->v_l);
 
-	// char *outbuffer = NULL;
-	// int final_size = prepareBuffer(*(outbuffer), outgoing_header, HEADER_SIZE_EXT, key_buffer, value_buffer);
-
 	if (CLIENT_SOCKET) {
 		sendData(CLIENT_SOCKET, outbuffer, final_size);
 		close(CLIENT_SOCKET);
@@ -219,8 +185,6 @@ int respondToClient(header_t *outgoing_header, header_t *incoming_header, char *
 		sendData(temp_socket, outbuffer, final_size);
 		close(temp_socket);
 	}
-
-	//free(outbuffer);
 
 	CLIENT_SOCKET = 0;
 	return 0;
@@ -356,6 +320,8 @@ int main(int argc, char *argv[]) {
 	SELF_IP = argv[2];
 	SELF_PORT = argv[3];
 
+	COLOR = colorCode(atoi(SELF_ID));
+
 	if (argc == 7) {
 		NEXT_ID = argv[4];
 		NEXT_IP = argv[5];
@@ -406,10 +372,10 @@ int main(int argc, char *argv[]) {
 		return 2;
 	}
 
-	printf("[%s] Coming online!\n", SELF_ID);
+	printf("\x1b[%dm[%s] Coming online!\x1b[0m\n", COLOR, SELF_ID);
 
 	if (!PREV_ID) {
-		printf("[%s] Trying to JOIN!\n", SELF_ID);
+		printf("\x1b[%dm[%s] Trying to JOIN!\x1b[0m\n", COLOR, SELF_ID);
 		join();
 	}
 
@@ -417,11 +383,11 @@ int main(int argc, char *argv[]) {
 	int firstSet = 0;
 
 	while (1) {
-		printf("[%s] Tick: %d PREV: %s, NEXT: %s\n", SELF_ID, tick, PREV_ID, NEXT_ID);
+		printf("\x1b[%dm[%s] Tick: %d PREV: %s, NEXT: %s\x1b[0m\n", COLOR, SELF_ID, tick, PREV_ID, NEXT_ID);
 		tick++;
 
 		if ((tick % STBZ_INTERVAL == 0) && atoi(SELF_ID) != atoi(NEXT_ID) && !firstSet) {
-			printf("[%s] Sending STABILIZE to %s\n", SELF_ID, NEXT_ID);
+			printf("\x1b[%dm[%s] Sending STABILIZE to %s\x1b[0m\n", COLOR, SELF_ID, NEXT_ID);
 			stabilize();
 			sleep(1);
 			continue;
@@ -451,7 +417,7 @@ int main(int argc, char *argv[]) {
 
 		do {
 			if ((rs = recv(temp_socket, request_ptr, read_size, 0)) < 0) {
-				fprintf(stderr, "![%s][main][recv]: %s\n", SELF_ID, strerror(errno));
+				fprintf(stderr, "!\x1b[%dm[%s][main][recv]: %s\x1b[0m\n", COLOR, SELF_ID, strerror(errno));
 				return 2;
 			}
 			read += rs;
@@ -502,29 +468,28 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (firstSet) {
-			// Operation was already completed by other peer, we should respond to client
 			if (incoming_header.intl && incoming_header.ack) {
 				respondToClient(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 				continue;
 			}
 
 			int key_hash = hash(key_buffer, incoming_header.k_l) % HASH_SPACE;
-			printf("[%s][main][hash] Key hash: %d\n", SELF_ID, key_hash);
+			printf("\x1b[%dm[%s][main][hash] Key hash: %d\x1b[0m\n", COLOR, SELF_ID, key_hash);
 
 			if (pass(key_hash)) {
-				printf("[%s][main][recv] Forwarding to peer %s\n", SELF_ID, NEXT_ID);
+				printf("\x1b[%dm[%s][main][recv] Forwarding to peer %s\x1b[0m\n", COLOR, SELF_ID, NEXT_ID);
 				requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 				continue;
 			}
 
 			if (incoming_header.set) {
-				printf("[%s][main][recv] Received SET Command\n", SELF_ID);
+				printf("\x1b[%dm[%s][main][recv] Received SET Command\x1b[0m\n", COLOR, SELF_ID);
 				outgoing_header->set = set(key_buffer, value_buffer, (int)incoming_header.k_l, (int)incoming_header.v_l);
 				outgoing_header->k_l = outgoing_header->v_l = 0;
 			}
 
 			if (incoming_header.get) {
-				printf("[%s][main][recv] Received GET Command\n", SELF_ID);
+				printf("\x1b[%dm[%s][main][recv] Received GET Command\x1b[0m\n", COLOR, SELF_ID);
 				struct element *e;
 				e = get(key_buffer, incoming_header.k_l);
 
@@ -538,7 +503,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			if (incoming_header.del) {
-				printf("[%s][main][recv] Received DEL Command\n", SELF_ID);
+				printf("\x1b[%dm[%s][main][recv] Received DEL Command\x1b[0m\n", COLOR, SELF_ID);
 				outgoing_header->del = del(key_buffer, incoming_header.k_l);
 				outgoing_header->k_l = outgoing_header->v_l = 0;
 			}
@@ -557,24 +522,22 @@ int main(int argc, char *argv[]) {
 
 		} else {
 			if (incoming_header.intl && incoming_header.join) {
-				printf("[%s][main][recv] Received JOIN Command\n", SELF_ID);
+				printf("\x1b[%dm[%s][main][recv] Received JOIN Command\x1b[0m\n", COLOR, SELF_ID);
 
 				if (pass(incoming_header.id)) {
-					printf("[%s][main][recv] Forward JOIN Command\n", SELF_ID);
+					printf("\x1b[%dm[%s][main][recv] Forward JOIN Command\x1b[0m\n", COLOR, SELF_ID);
 					requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 				} else {
 					*PREV_IP = (char)incoming_header.ip;
 					snprintf(PREV_ID, sizeof(PREV_ID), "%d", incoming_header.id);
 					snprintf(PREV_PORT, sizeof(PREV_PORT), "%d", incoming_header.port);
-					printf("[%s][recv][join] Updated PREV: %s, Sending NOTIFY to %s\n", SELF_ID, PREV_ID, PREV_ID);
+					printf("\x1b[%dm[%s][recv][join] Updated PREV: %s, Sending NOTIFY to %s\x1b[0m\n", COLOR, SELF_ID, PREV_ID, PREV_ID);
 
 					if (atoi(SELF_ID) == atoi(NEXT_ID)) {
 						*NEXT_IP = (char)incoming_header.ip;
 						snprintf(NEXT_ID, sizeof(NEXT_ID), "%d", incoming_header.id);
 						snprintf(NEXT_PORT, sizeof(NEXT_PORT), "%d", incoming_header.port);
-						printf("[%s][recv][join] Also updated NEXT: %s\n", SELF_ID, NEXT_ID);
 					}
-
 					notify(PREV_IP, PREV_PORT, PREV_ID, PREV_IP, PREV_PORT);
 				}
 				close(temp_socket);
@@ -582,13 +545,13 @@ int main(int argc, char *argv[]) {
 			}
 
 			if (incoming_header.intl && incoming_header.noti) {
-				printf("[%s][main][recv] Received NOTIFY Command\n", SELF_ID);
+				printf("\x1b[%dm[%s][main][recv] Received NOTIFY Command\x1b[0m\n", COLOR, SELF_ID);
 
 				if (incoming_header.id != atoi(SELF_ID)) {
 					*NEXT_IP = (char)incoming_header.ip;
 					snprintf(NEXT_ID, sizeof(NEXT_ID), "%d", incoming_header.id);
 					snprintf(NEXT_PORT, sizeof(NEXT_PORT), "%d", incoming_header.port);
-					printf("[%s][recv][noti] Updated NEXT: %s\n", SELF_ID, NEXT_ID);
+					printf("\x1b[%dm[%s][recv][noti] Updated NEXT: %s\x1b[0m\n", COLOR, SELF_ID, NEXT_ID);
 				}
 
 				close(temp_socket);
@@ -596,7 +559,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			if (incoming_header.intl && incoming_header.stbz) {
-				printf("[%s][main][recv] Received STABILIZE Command\n", SELF_ID);
+				printf("\x1b[%dm[%s][main][recv] Received STABILIZE Command\x1b[0m\x1b[0m\n", COLOR, SELF_ID);
 
 				if (!PREV_ID) {
 					// Initializing only
@@ -607,7 +570,7 @@ int main(int argc, char *argv[]) {
 					*PREV_IP = (char)incoming_header.ip;
 					snprintf(PREV_ID, sizeof(PREV_ID), "%d", incoming_header.id);
 					snprintf(PREV_PORT, sizeof(PREV_PORT), "%d", incoming_header.port);
-					printf("[%s][recv][stbz] Updated PREV: %s\n", SELF_ID, PREV_ID);
+					printf("\x1b[%dm[%s][recv][stbz] Updated PREV: %s\n", COLOR, SELF_ID, PREV_ID);
 					close(temp_socket);
 					continue;
 
@@ -616,7 +579,7 @@ int main(int argc, char *argv[]) {
 					outgoing_header->ip = atoi(PREV_IP);
 					outgoing_header->port = atoi(PREV_PORT);
 					outgoing_header->noti = 1;
-					printf("[%s][recv][stbz] Responding with PREV %s\n", SELF_ID, PREV_ID);
+					printf("\x1b[%dm[%s][recv][stbz] Responding with PREV %s\x1b[0m\n", COLOR, SELF_ID, PREV_ID);
 
 					char *FROM_IP = strdup(SELF_IP);
 					char *FROM_PORT = strdup(SELF_PORT);
@@ -625,7 +588,7 @@ int main(int argc, char *argv[]) {
 					snprintf(FROM_PORT, sizeof(FROM_PORT), "%d", incoming_header.port);
 
 					notify(FROM_IP, FROM_PORT, PREV_ID, PREV_IP, PREV_PORT);
-					printf("[%s][recv][stbz] Notified peer %d\n", SELF_ID, incoming_header.id);
+					printf("\x1b[%dm[%s][recv][stbz] Notified peer %d\x1b[0m\n", COLOR, SELF_ID, incoming_header.id);
 					close(temp_socket);
 					continue;
 				}
