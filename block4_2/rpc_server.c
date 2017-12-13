@@ -97,7 +97,7 @@ int requestFromNextPeer(header_t *outgoing_header, header_t *incoming_header, ch
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 
-	if ((status = getaddrinfo(NEXT_IP, NEXT_PORT, &hints, &res)) != 0) {
+	if ((status = getaddrinfo(SELF_IP, NEXT_PORT, &hints, &res)) != 0) {
 		fprintf(stderr, "![%s][requestFromNextPeer][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
@@ -293,7 +293,7 @@ int stabilize() {
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 
-	if ((status = getaddrinfo(NEXT_IP, NEXT_PORT, &hints, &res)) != 0) {
+	if ((status = getaddrinfo(SELF_IP, NEXT_PORT, &hints, &res)) != 0) {
 		fprintf(stderr, "![%s][stabilize][getaddrinfo]: %s\n", SELF_ID, strerror(status));
 		return 2;
 	}
@@ -528,13 +528,13 @@ int main(int argc, char *argv[]) {
 					printf("\x1b[%dm[%s][main][recv] Forward JOIN Command\x1b[0m\n", COLOR, SELF_ID);
 					requestFromNextPeer(outgoing_header, &incoming_header, key_buffer, value_buffer, temp_socket);
 				} else {
-					*PREV_IP = (char)incoming_header.ip;
+					snprintf(PREV_IP, sizeof(PREV_IP), "%d", incoming_header.ip);
 					snprintf(PREV_ID, sizeof(PREV_ID), "%d", incoming_header.id);
 					snprintf(PREV_PORT, sizeof(PREV_PORT), "%d", incoming_header.port);
 					printf("\x1b[%dm[%s][recv][join] Updated PREV: %s, Sending NOTIFY to %s\x1b[0m\n", COLOR, SELF_ID, PREV_ID, PREV_ID);
 
 					if (atoi(SELF_ID) == atoi(NEXT_ID)) {
-						*NEXT_IP = (char)incoming_header.ip;
+						snprintf(NEXT_IP, sizeof(NEXT_IP), "%d", incoming_header.ip);
 						snprintf(NEXT_ID, sizeof(NEXT_ID), "%d", incoming_header.id);
 						snprintf(NEXT_PORT, sizeof(NEXT_PORT), "%d", incoming_header.port);
 					}
@@ -548,7 +548,7 @@ int main(int argc, char *argv[]) {
 				printf("\x1b[%dm[%s][main][recv] Received NOTIFY Command\x1b[0m\n", COLOR, SELF_ID);
 
 				if (incoming_header.id != atoi(SELF_ID)) {
-					*NEXT_IP = (char)incoming_header.ip;
+					snprintf(NEXT_IP, sizeof(NEXT_IP), "%d", incoming_header.ip);
 					snprintf(NEXT_ID, sizeof(NEXT_ID), "%d", incoming_header.id);
 					snprintf(NEXT_PORT, sizeof(NEXT_PORT), "%d", incoming_header.port);
 					printf("\x1b[%dm[%s][recv][noti] Updated NEXT: %s\x1b[0m\n", COLOR, SELF_ID, NEXT_ID);
@@ -567,7 +567,7 @@ int main(int argc, char *argv[]) {
 					PREV_ID = strdup(SELF_ID);
 					PREV_PORT = strdup(SELF_PORT);
 
-					*PREV_IP = (char)incoming_header.ip;
+					snprintf(PREV_IP, sizeof(PREV_IP), "%d", incoming_header.ip);
 					snprintf(PREV_ID, sizeof(PREV_ID), "%d", incoming_header.id);
 					snprintf(PREV_PORT, sizeof(PREV_PORT), "%d", incoming_header.port);
 					printf("\x1b[%dm[%s][recv][stbz] Updated PREV: %s\n", COLOR, SELF_ID, PREV_ID);
@@ -581,8 +581,8 @@ int main(int argc, char *argv[]) {
 					outgoing_header->noti = 1;
 					printf("\x1b[%dm[%s][recv][stbz] Responding with PREV %s\x1b[0m\n", COLOR, SELF_ID, PREV_ID);
 
-					char *FROM_IP = strdup(SELF_IP);
-					char *FROM_PORT = strdup(SELF_PORT);
+					char *FROM_IP = malloc(4);
+					char *FROM_PORT = malloc(2);
 
 					snprintf(FROM_IP, sizeof(FROM_IP), "%d", incoming_header.ip);
 					snprintf(FROM_PORT, sizeof(FROM_PORT), "%d", incoming_header.port);
