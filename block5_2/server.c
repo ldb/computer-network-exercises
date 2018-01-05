@@ -17,7 +17,6 @@ onion_connection_status movie_handler(void *_, onion_request * req, onion_respon
 
 	const onion_block *dreq = onion_request_get_data(req); // Request body
 	const char *rqpath = onion_request_get_path(req); // Request query
-
 	char key[16];
 
 	if (flagextraction == OR_GET) {
@@ -42,7 +41,6 @@ onion_connection_status movie_handler(void *_, onion_request * req, onion_respon
 		}
 
 		char *reqbody = (char*) onion_block_data(dreq);
-
 		sprintf(key, "%u", ht_hash(reqbody, strlen(reqbody)));
 
 		if (ht_set(key, reqbody, strlen(key), strlen(reqbody)) != 1) {
