@@ -3,6 +3,7 @@
 #include <onion/onion.h>
 #include <onion/block.h>
 #include <onion/shortcuts.h>
+#include <onion/types.h>
 #include <hashtable/hashtable.h>
 
 #include <stdio.h>
@@ -10,53 +11,6 @@
 #include <string.h>
 
 onion *o = NULL;
-
-onion_connection_status example_handler(void *_, onion_request * req, onion_response * res) {
-	int flags = onion_request_get_flags(req);
-	int flagextraction = flags & 7;
-
-	const onion_block *dreq = onion_request_get_data(req);
-
-	if (flagextraction == OR_PUT) {
-		onion_response_printf(res, "Received put.\n");
-
-		if (dreq) {
-			/* libonion stores every put in a tempfile :( */
-			char buffer[512];
-			FILE *tmpfile;
-			size_t nread;
-
-			onion_response_printf(res, "Request Body: ");
-
-			tmpfile = fopen(onion_block_data(dreq), "r");
-			if (tmpfile) {
-				while ((nread = fread(buffer, 1, 511, tmpfile)) > 0) {
-					buffer[nread] = '\0';
-					onion_response_printf(res, "%s", buffer);
-				}
-				fclose(tmpfile);
-			}
-			onion_response_printf(res, "\n");
-		}
-
-		return OCS_PROCESSED;
-
-	} else if (flagextraction == OR_POST) {
-		onion_response_printf(res, "Received post.\n");
-	} else if (flagextraction == OR_DELETE) {
-		onion_response_printf(res, "Received delete.\n");
-	} else {
-		onion_response_printf(res, "Method not supported!\n");
-		return OCS_PROCESSED;
-	}
-
-	if (dreq) {
-		onion_response_printf(res, "Request Body: %s\n", onion_block_data(dreq));
-	}
-
-	return OCS_PROCESSED;
-}
-
 onion_connection_status movie_handler(void *_, onion_request * req, onion_response * res) {
 	int flags = onion_request_get_flags(req);
 	int flagextraction = flags & 7;
@@ -64,48 +18,55 @@ onion_connection_status movie_handler(void *_, onion_request * req, onion_respon
 	const onion_block *dreq = onion_request_get_data(req); // Request body
 	const char *rqpath = onion_request_get_path(req); // Request query
 
-	unsigned int key = 0;
+	char key[16];
 
 	if (flagextraction == OR_GET) {
-		printf("%s", "Received GET.\n");
-		if (rqpath) {
-			key = ht_hash(rqpath, strlen(rqpath));
+		if (rqpath && !rqpath[0]) {
+			onion_response_set_code(res, HTTP_BAD_REQUEST);
+			return OCS_PROCESSED;
 		}
 
-		printf("Key: %s", &key);
 		struct element *e;
-		if ((e = ht_get((char *) &key, sizeof(key))) != NULL) {
-			printf("Val: %s", e->value);
-			onion_response_printf(res, "%s", e->value);
+		if ((e = ht_get((char*)rqpath, strlen(rqpath))) == NULL) {
+			onion_response_set_code(res, HTTP_NOT_FOUND);
+			return OCS_PROCESSED;
 		}
+
+		onion_response_printf(res, "%s\n", e->value);
 	}
+
 	else if (flagextraction == OR_POST) {
-		// if path, deny
-
-		if (dreq) {
-			key = ht_hash(onion_block_data(dreq), strlen(onion_block_data(dreq)));
+		if (!dreq || (rqpath && rqpath[0])) {
+			onion_response_set_code(res, HTTP_BAD_REQUEST);
+			return OCS_PROCESSED;
 		}
 
-		ht_set((char *) &key, (char *) onion_block_data(dreq), sizeof(key), sizeof(onion_block_data(dreq)));
-		onion_response_printf(res, "{\"id\":%u}\n", key);
+		char *reqbody = (char*) onion_block_data(dreq);
+
+		sprintf(key, "%u", ht_hash(reqbody, strlen(reqbody)));
+
+		if (ht_set(key, reqbody, strlen(key), strlen(reqbody)) != 1) {
+			onion_response_set_code(res, HTTP_INTERNAL_ERROR);
+			return OCS_PROCESSED;
+		}
+
+		onion_response_set_code(res, HTTP_CREATED);
+		onion_response_printf(res, "{\"id\":%s}\n", key);
+
 	} else if (flagextraction == OR_DELETE) {
-		if (rqpath) {
-			key = ht_hash(rqpath, strlen(rqpath));
+		if (rqpath && !rqpath[0]) {
+			onion_response_set_code(res, HTTP_BAD_REQUEST);
+			return OCS_PROCESSED;
 		}
 
-		ht_del((char *) &key, sizeof(key));
-		onion_response_printf(res, "Received delete.\n");
+		if (ht_del((char*)rqpath, strlen(rqpath)) != 1) {
+			onion_response_set_code(res, HTTP_INTERNAL_ERROR);
+			return OCS_PROCESSED;
+		};
+
+		onion_response_set_code(res, 204);
 	} else {
 		onion_response_printf(res, "Method not supported!\n");
-		return OCS_PROCESSED;
-	}
-
-	if (rqpath) {
-		onion_response_printf(res, "Request Path: %s\n", rqpath);
-	}
-
-	if (dreq) {
-		onion_response_printf(res, "Request Body: %s\n", onion_block_data(dreq));
 	}
 
 	return OCS_PROCESSED;
@@ -116,19 +77,22 @@ void onexit(int _) {
 	if (o) {
 		onion_listen_stop(o);
 	}
+	cleanup();
 }
 
 int main(int argc, char **argv) {
+	if(argc != 2) {
+		fprintf(stderr, "arguments: port\n");
+		return 1;
+	}
 
 	o = onion_new(O_ONE_LOOP);
-	onion_set_port(o, "8080");
+	onion_set_port(o, argv[1]);
 	onion_url *urls = onion_root_url(o);
 
 	ht_init(100);
 
 	onion_url_add_static(urls, "", "Server running :)!\n", HTTP_OK);
-
-	onion_url_add(urls, "example", example_handler);
 	onion_url_add(urls, "^movie/", movie_handler);
 
 	signal(SIGTERM, onexit);
