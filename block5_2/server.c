@@ -32,9 +32,7 @@ onion_connection_status movie_handler(void *_, onion_request * req, onion_respon
 		}
 
 		onion_response_printf(res, "%s\n", e->value);
-	}
-
-	else if (flagextraction == OR_POST) {
+	} else if (flagextraction == OR_POST) {
 		if (!dreq || (rqpath && rqpath[0])) {
 			onion_response_set_code(res, HTTP_BAD_REQUEST);
 			return OCS_PROCESSED;
@@ -42,7 +40,6 @@ onion_connection_status movie_handler(void *_, onion_request * req, onion_respon
 
 		char *reqbody = (char*) onion_block_data(dreq);
 		sprintf(key, "%u", ht_hash(reqbody, strlen(reqbody)));
-
 		if (ht_set(key, reqbody, strlen(key), strlen(reqbody)) != 1) {
 			onion_response_set_code(res, HTTP_INTERNAL_ERROR);
 			return OCS_PROCESSED;
@@ -50,7 +47,6 @@ onion_connection_status movie_handler(void *_, onion_request * req, onion_respon
 
 		onion_response_set_code(res, HTTP_CREATED);
 		onion_response_printf(res, "{\"id\":%s}\n", key);
-
 	} else if (flagextraction == OR_DELETE) {
 		if (rqpath && !rqpath[0]) {
 			onion_response_set_code(res, HTTP_BAD_REQUEST);
@@ -75,7 +71,7 @@ void onexit(int _) {
 	if (o) {
 		onion_listen_stop(o);
 	}
-	cleanup();
+	ht_cleanup();
 }
 
 int main(int argc, char **argv) {
