@@ -145,6 +145,6 @@ void ht_init(int tablesize) {
 }
 
 // free the allocated memory of the hashtable
-void cleanup() {
+void ht_cleanup() {
 	free(hashtable);
 }
