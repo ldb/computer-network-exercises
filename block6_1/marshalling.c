@@ -123,7 +123,6 @@ void marshal(unsigned char *out_payload, ntp_payload_t *payload) {
 	out_payload[45] = (unsigned char) (payload->transmit_timestamp >> 16);
 	out_payload[46] = (unsigned char) (payload->transmit_timestamp >> 8);
 	out_payload[47] = (unsigned char) (payload->transmit_timestamp % 256);
-
 }
 
 void printPayload(ntp_payload_t *payload) {
