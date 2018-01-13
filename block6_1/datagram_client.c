@@ -16,8 +16,10 @@
 
 struct timeref_t {
 	int err;
-	clock_t send_time;
-	clock_t receive_time;
+	double long c_send_time;
+	double long c_receive_time;
+	double long s_receive_time;
+	double long s_send_time;
 };
 
 struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
@@ -41,7 +43,7 @@ struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 	unsigned char msg[48];
 	marshal(&msg[0], payload);
 	
-	times.send_time = clock();
+	times.c_send_time = (double long)clock();
 	if(sendto(sockfd, msg, sizeof msg, 0, res->ai_addr, res->ai_addrlen) <= 0) {
 		fprintf(stderr, "recv: %s\n", strerror(errno));
 		times.err = -1;
@@ -55,7 +57,7 @@ struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 		times.err = -1;
 		return times;
 	}
-	times.receive_time = clock();
+	times.c_receive_time = (double long)clock();
 
 	char str[res->ai_addrlen];
 	inet_ntop(AF_INET, &res->ai_addr, str, res->ai_addrlen);
@@ -68,8 +70,8 @@ struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 	return times;
 }
 
-float calculateDelay(struct timeref_t client, ntp_payload_t *server){ return 0.0;}
-float calculateOffset(struct timeref_t client, ntp_payload_t *server){ return 0.0;}
+float calculateDelay(struct timeref_t client){ return 0.0;}
+float calculateOffset(struct timeref_t client){ return 0.0;}
 
 int main(int argc, char *argv[]) {
 	if(argc <= 1) {
@@ -78,17 +80,18 @@ int main(int argc, char *argv[]) {
 	}
 
 	for (int i = 1; i < argc; i++) {
-		ntp_payload_t *test = (ntp_payload_t*) malloc(sizeof(ntp_payload_t));
-		memset(test, 0, sizeof(ntp_payload_t));
+		ntp_payload_t *payload = (ntp_payload_t*) malloc(sizeof(ntp_payload_t));
+		memset(payload, 0, sizeof(ntp_payload_t));
 
-		test->vn = 4;
-		test->mode = 3;
+		payload->vn = 4;
+		payload->mode = 3;
 
-		struct timeref_t client_delay;
-		client_delay = ntpRequest(argv[i], test);
+		struct timeref_t times;
+		times = ntpRequest(argv[i], payload);
+		times.s_send_time = payload.
+
 
 		printf("%d - %s\n", i, argv[i]);
-		printPayload(test);
 		printf("\n");
 	}
 	return 0;
