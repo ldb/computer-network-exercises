@@ -14,13 +14,20 @@
 #define NTP_PORT "123"
 #define NTP_SECOND_OFFSET 2208988800
 
-struct timeref_t {
+typedef struct timeref_t {
 	int err;
 	unsigned long c_s;
 	unsigned long c_r;
 	unsigned long s_r;
 	unsigned long s_s;
-};
+} timeref_t;
+
+typedef struct times_t {
+	double c_s;
+	double c_r;
+	double s_r;
+	double s_s;
+} times_t;
 
 unsigned long getTime() {
 	struct timespec ts;
@@ -81,17 +88,17 @@ struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 	return times;
 }
 
-unsigned long calculateDelay(struct timeref_t *times){ 
+double calculateOffset(struct times_t *times){ 
 	return ((times->s_r - times->c_s) + (times->s_s - times->c_r)) / 2;
 }
 
-unsigned long calculateOffset(struct timeref_t *times){ 
+double calculateDelay(struct times_t *times){ 
 	return ((times->c_r - times->c_s) - (times->s_s - times->s_r));
 }
 
-double normalizeTime(unsigned long time) {
+double normalizeTime(unsigned long time, int ntp) {
 	double s = 0.0 + (time >> 32);
-	double ms = (double)((time << 32) >> 32) / 1000;
+	double ms = (double)((time << 32) >> 32) / (ntp ? 1e10 : 1e3);
 	return s + ms;
 }
 
@@ -101,11 +108,11 @@ void addOffsets(struct timeref_t *times) {
 	times->s_r = times->s_r - (NTP_SECOND_OFFSET << 32);
 }
 
-void printTimes(struct timeref_t *times) {
-	printf("client send: %lu\n", times->c_s >> 32);
-	printf("server recv: %lu\n", times->s_r >> 32);
-	printf("server send: %lu\n", times->s_s >> 32);
-	printf("client recv: %lu\n", times->c_r >> 32);
+void printTimes(struct times_t *times) {
+	printf("client send: %f\n", times->c_s);
+	printf("server recv: %f\n", times->s_r);
+	printf("server send: %f\n", times->s_s );
+	printf("client recv: %f\n", times->c_r);
 }
 
 int main(int argc, char *argv[]) {
@@ -113,6 +120,10 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "arguments: hostname [, hostname ...]\n");
 		return 1;
 	}
+
+	int bestServer = 0;
+	double bestDelay = 1;
+	double bestOffset = 0;
 
 	for (int i = 1; i < argc; i++) {
 		ntp_payload_t *payload = (ntp_payload_t*) malloc(sizeof(ntp_payload_t));
@@ -123,13 +134,31 @@ int main(int argc, char *argv[]) {
 
 		struct timeref_t times = ntpRequest(argv[i], payload);
 		addOffsets(&times);
-		printTimes(&times);
 
-		printf("%lu - %lf", times.c_s, normalizeTime(times.c_s));
+		struct times_t seconds = {
+			.c_s = normalizeTime(times.c_s, 0),
+			.c_r = normalizeTime(times.c_r, 0),
+			.s_r = normalizeTime(times.s_r, 1),
+			.s_s = normalizeTime(times.s_s, 1)
+		};
 
-		//printf("%d - %s\t%f\t%f\n", i, argv[i], normalizeTime(times.c_s), normalizeTime(times.s_r));
+		double delay = calculateDelay(&seconds);
+		double offset = calculateOffset(&seconds);
+
+		if (delay < bestDelay) {
+			bestServer = 1;
+			bestOffset = offset;
+		}
+		
+		//printTimes(&seconds);
+		//printf("%lu - %lf", times.c_s, normalizeTime(times.c_s));
+
+		printf("%d\tServer: %s\n\tOffset: %f\n\tDelay: %f\n", i, argv[i], offset, delay);
 		printf("\n");
 	}
+
+	printf("Best Server: %d\n", bestServer);
+	printf("Current clock (%f) should be adjusted by %f seconds\n", normalizeTime(getTime(), 0), bestOffset);
 	return 0;
 }
 
