@@ -48,7 +48,7 @@ struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;
 
-	if((status = getaddrinfo(host, NTP_PORT, &hints, &res)) != 0) {
+	if ((status = getaddrinfo(host, NTP_PORT, &hints, &res)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", strerror(status));
 		times.err = -1;
 		return times;
@@ -58,11 +58,13 @@ struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	unsigned char msg[48];
+	payload->vn = 4;
+	payload->mode = 3;
 	marshal(&msg[0], payload);
-	
+
 	times.c_s = getTime();
 
-	if(sendto(sockfd, msg, sizeof msg, 0, res->ai_addr, res->ai_addrlen) <= 0) {
+	if (sendto(sockfd, msg, sizeof msg, 0, res->ai_addr, res->ai_addrlen) <= 0) {
 		fprintf(stderr, "recv: %s\n", strerror(errno));
 		times.err = -1;
 		return times;
@@ -70,12 +72,12 @@ struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 
 	unsigned char response[48];
 
-	if((recvfrom(sockfd, response, 48, MSG_WAITALL, res->ai_addr, &res->ai_addrlen)) <= 0) {
+	if ((recvfrom(sockfd, response, 48, MSG_WAITALL, res->ai_addr, &res->ai_addrlen)) <= 0) {
 		fprintf(stderr, "recv: %s\n", strerror(errno));
 		times.err = -1;
 		return times;
 	}
-	
+
 	times.c_r = getTime();
 
 	unmarshal(payload, &response[0]);
@@ -88,11 +90,11 @@ struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 	return times;
 }
 
-double calculateOffset(struct times_t *times){ 
+double calculateOffset(struct times_t *times) {
 	return ((times->s_r - times->c_s) + (times->s_s - times->c_r)) / 2;
 }
 
-double calculateDelay(struct times_t *times){ 
+double calculateDelay(struct times_t *times) {
 	return ((times->c_r - times->c_s) - (times->s_s - times->s_r));
 }
 
@@ -102,21 +104,13 @@ double normalizeTime(unsigned long time, int ntp) {
 	return s + ms;
 }
 
-
 void addOffsets(struct timeref_t *times) {
 	times->s_s = times->s_s - (NTP_SECOND_OFFSET << 32);
 	times->s_r = times->s_r - (NTP_SECOND_OFFSET << 32);
 }
 
-void printTimes(struct times_t *times) {
-	printf("client send: %f\n", times->c_s);
-	printf("server recv: %f\n", times->s_r);
-	printf("server send: %f\n", times->s_s );
-	printf("client recv: %f\n", times->c_r);
-}
-
 int main(int argc, char *argv[]) {
-	if(argc <= 1) {
+	if (argc <= 1) {
 		fprintf(stderr, "arguments: hostname [, hostname ...]\n");
 		return 1;
 	}
@@ -125,12 +119,12 @@ int main(int argc, char *argv[]) {
 	double bestDelay = 1;
 	double bestOffset = 0;
 
+	printf("  | Server                  | Stratum  | Offset  | Delay    |\n");
+	printf("------------------------------------------------------------\n");
+
 	for (int i = 1; i < argc; i++) {
 		ntp_payload_t *payload = (ntp_payload_t*) malloc(sizeof(ntp_payload_t));
 		memset(payload, 0, sizeof(ntp_payload_t));
-
-		payload->vn = 4;
-		payload->mode = 3;
 
 		struct timeref_t times = ntpRequest(argv[i], payload);
 		addOffsets(&times);
@@ -149,15 +143,11 @@ int main(int argc, char *argv[]) {
 			bestServer = 1;
 			bestOffset = offset;
 		}
-		
-		//printTimes(&seconds);
-		//printf("%lu - %lf", times.c_s, normalizeTime(times.c_s));
 
-		printf("%d\tServer: %s\n\tOffset: %f\n\tDelay: %f\n", i, argv[i], offset, delay);
-		printf("\n");
+		printf("%2d|%-25s|%10d|%9f|%10f|\n", i, argv[i], payload->stratum, offset, delay);
 	}
 
-	printf("Best Server: %d\n", bestServer);
+	printf("\nBest Server: %d\n", bestServer);
 	printf("Current clock (%f) should be adjusted by %f seconds\n", normalizeTime(getTime(), 0), bestOffset);
 	return 0;
 }
