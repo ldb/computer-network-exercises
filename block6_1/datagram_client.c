@@ -16,11 +16,21 @@
 
 struct timeref_t {
 	int err;
-	double long c_send_time;
-	double long c_receive_time;
-	double long s_receive_time;
-	double long s_send_time;
+	unsigned long c_s;
+	unsigned long c_r;
+	unsigned long s_r;
+	unsigned long s_s;
 };
+
+unsigned long getTime() {
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	unsigned long s = (unsigned long)ts.tv_sec;
+	unsigned long ms = (unsigned long)(ts.tv_nsec / 1.0e6);
+	unsigned long result = (s << 32) | ms;
+	return result;
+}
 
 struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 	struct addrinfo hints, *res;
@@ -43,7 +53,9 @@ struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 	unsigned char msg[48];
 	marshal(&msg[0], payload);
 	
-	times.c_send_time = (double long)clock();
+	times.c_s = getTime();
+	//clock_gettime(CLOCK_REALTIME, &times.c_s);
+
 	if(sendto(sockfd, msg, sizeof msg, 0, res->ai_addr, res->ai_addrlen) <= 0) {
 		fprintf(stderr, "recv: %s\n", strerror(errno));
 		times.err = -1;
@@ -57,11 +69,9 @@ struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 		times.err = -1;
 		return times;
 	}
-	times.c_receive_time = (double long)clock();
-
-	char str[res->ai_addrlen];
-	inet_ntop(AF_INET, &res->ai_addr, str, res->ai_addrlen);
-	printf("%s\n", str);
+	
+	times.c_r = getTime();
+	//clock_gettime(CLOCK_REALTIME, &times.c_r);
 
 	unmarshal(payload, &response[0]);
 	freeaddrinfo(res);
@@ -70,14 +80,33 @@ struct timeref_t ntpRequest(char *host, ntp_payload_t *payload) {
 	return times;
 }
 
-float calculateDelay(struct timeref_t client){ return 0.0;}
-float calculateOffset(struct timeref_t client){ return 0.0;}
+unsigned long calculateDelay(struct timeref_t *times){ 
+	return ((times->s_r - times->c_s) + (times->s_s - times->c_r)) / 2;
+}
+
+unsigned long calculateOffset(struct timeref_t *times){ 
+	return ((times->c_r - times->c_s) - (times->s_s - times->s_r));
+}
+
+
+void addOffsets(struct timeref_t *times) {
+	times->s_s = times->s_s - (NTP_SECOND_OFFSET << 32);
+	times->s_r = times->s_r - (NTP_SECOND_OFFSET << 32);
+}
+
+void printTimes(struct timeref_t *times) {
+	printf("client send: %lu\n", times->c_s);
+	printf("server recv: %lu\n", times->s_r);
+	printf("server send: %lu\n", times->s_s);
+	printf("client recv: %lu\n", times->c_r);
+}
 
 int main(int argc, char *argv[]) {
 	if(argc <= 1) {
 		fprintf(stderr, "arguments: hostname [, hostname ...]\n");
 		return 1;
 	}
+	printf("#  - Server - - - - - Offset - - - - Delay\n");
 
 	for (int i = 1; i < argc; i++) {
 		ntp_payload_t *payload = (ntp_payload_t*) malloc(sizeof(ntp_payload_t));
@@ -88,10 +117,12 @@ int main(int argc, char *argv[]) {
 
 		struct timeref_t times;
 		times = ntpRequest(argv[i], payload);
-		times.s_send_time = payload.
+		times.s_r = (unsigned long)payload->receive_timestamp;
+		times.s_s = (unsigned long)payload->transmit_timestamp;
+		addOffsets(&times);
+		//printTimes(&times);
 
-
-		printf("%d - %s\n", i, argv[i]);
+		printf("%d - %s\t%lu\t%lu\n", i, argv[i], calculateOffset(&times) >> 32, calculateDelay(&times) >> 32);
 		printf("\n");
 	}
 	return 0;
