@@ -104,7 +104,7 @@ double normalizeTime(unsigned long time, int ntp) {
 	return s + ms;
 }
 
-void addOffsets(struct timeref_t *times) {
+void addUnixOffsets(struct timeref_t *times) {
 	times->s_s = times->s_s - (NTP_SECOND_OFFSET << 32);
 	times->s_r = times->s_r - (NTP_SECOND_OFFSET << 32);
 }
@@ -119,15 +119,15 @@ int main(int argc, char *argv[]) {
 	double bestDelay = 1;
 	double bestOffset = 0;
 
-	printf("  | Server                  | Stratum  | Offset  | Delay    |\n");
-	printf("------------------------------------------------------------\n");
+	printf("  | Server                                      | Stratum  | Offset  | Delay    |\n");
+	printf("---------------------------------------------------------------------------------\n");
 
 	for (int i = 1; i < argc; i++) {
 		ntp_payload_t *payload = (ntp_payload_t*) malloc(sizeof(ntp_payload_t));
 		memset(payload, 0, sizeof(ntp_payload_t));
 
 		struct timeref_t times = ntpRequest(argv[i], payload);
-		addOffsets(&times);
+		addUnixOffsets(&times);
 
 		struct times_t seconds = {
 			.c_s = normalizeTime(times.c_s, 0),
@@ -140,14 +140,14 @@ int main(int argc, char *argv[]) {
 		double offset = calculateOffset(&seconds);
 
 		if (delay < bestDelay) {
-			bestServer = 1;
+			bestServer = i;
 			bestOffset = offset;
 		}
 
-		printf("%2d|%-25s|%10d|%9f|%10f|\n", i, argv[i], payload->stratum, offset, delay);
+		printf("%2d|%-45s|%10d|%9f|%10f|\n", i, argv[i], payload->stratum, offset, delay);
 	}
 
-	printf("\nBest Server: %d\n", bestServer);
+	printf("\nBest Server based on delay: %d: %s\n", bestServer, argv[bestServer]);
 	printf("Current clock (%f) should be adjusted by %f seconds\n", normalizeTime(getTime(), 0), bestOffset);
 	return 0;
 }
