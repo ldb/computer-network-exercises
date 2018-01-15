@@ -142,6 +142,7 @@ int main(int argc, char *argv[]) {
 		if (delay < bestDelay) {
 			bestServer = i;
 			bestOffset = offset;
+			bestDelay = delay;
 		}
 
 		printf("%2d|%-45s|%10d|%9f|%10f|\n", i, argv[i], payload->stratum, offset, delay);
