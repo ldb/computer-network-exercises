@@ -129,7 +129,7 @@ int main(int argc, char *argv[]) {
 		double bestDelay = 1;
 		double bestOffset = 0;
 
-		printf("ANFRAGE %d\n", j);
+		printf("ANFRAGE %d\n", j+1);
 		printf("  | Server                                      | Stratum  | Offset  | Delay    | R.-Disp. |\n");
 		printf("---------------------------------------------------------------------------------\n");
 
