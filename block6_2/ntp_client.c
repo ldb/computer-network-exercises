@@ -121,6 +121,9 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	printf("# | Server                                      | Stratum  | Offset  | Delay    | R.-Disp. |\n");
+	printf("--------------------------------------------------------------------------------------------\n");
+
 	struct data_t *data[4];
 	for(int i = 0; i < 4; i++) data[i] = (data_t*)malloc(sizeof(data_t));
 
@@ -128,10 +131,6 @@ int main(int argc, char *argv[]) {
 		int bestServer = 0;
 		double bestDelay = 1;
 		double bestOffset = 0;
-
-		printf("ANFRAGE %d\n", j+1);
-		printf("  | Server                                      | Stratum  | Offset  | Delay    | R.-Disp. |\n");
-		printf("---------------------------------------------------------------------------------\n");
 
 		for (int i = 1; i < argc; i++) {
 			ntp_payload_t *payload = (ntp_payload_t*) malloc(sizeof(ntp_payload_t));
@@ -159,13 +158,10 @@ int main(int argc, char *argv[]) {
 				bestDelay = delay;
 			}
 
-			printf("%2d|%-45s|%10d|%9f|%10f|%10d|\n", i, argv[i], payload->stratum, offset, delay, payload->root_dispersion);
+			printf("%2d|%-45s|%10d|%9f|%10f|%10d|\n", j, argv[i], payload->stratum, offset, delay, payload->root_dispersion);
 		}
 
-		printf("\nBest Server based on delay: %d: %s\n", bestServer, argv[bestServer]);
-		printf("Current clock (%f) should be adjusted by %f seconds\n", normalizeTime(getTime(), 0), bestOffset);
-
-		sleep(6);
+		sleep(10);
 	}
 	return 0;
 }
