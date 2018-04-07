@@ -68,14 +68,14 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 
-	if((status = getaddrinfo(HOST, PORT, &hints, &res)) != 0) {
+	if ((status = getaddrinfo(HOST, PORT, &hints, &res)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", strerror(status));
 		return 2;
 	}
 
 	int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	
-	if(connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
+
+	if (connect(sockfd, res->ai_addr, res->ai_addrlen) != 0) {
 		fprintf(stderr, "connect: %s\n", strerror(errno));
 		return 2;
 	}
@@ -83,7 +83,7 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 	int to_send = size;
 	do {
 		int sent;
-		if((sent = send(sockfd, out_buffer, to_send, 0)) == -1){
+		if ((sent = send(sockfd, out_buffer, to_send, 0)) == -1) {
 			fprintf(stderr, "send: %s\n", strerror(errno));
 			return 2;
 		}
@@ -95,7 +95,7 @@ int do_rpc(char *out_buffer, int size, element_t *element) {
 	} while (0 < to_send);
 	out_buffer -= size;
 
-	free(out_buffer);	
+	free(out_buffer);
 	unsigned char request_header[HEADER_SIZE];
 	char *request_ptr = (char*)request_header;
 	memset(&request_header, 0, HEADER_SIZE);
@@ -185,7 +185,7 @@ int del(char *key, int keylen) {
 	char *outbuffer = malloc(final_size);
 	memcpy(outbuffer, out_header, HEADER_SIZE);
 	memcpy(outbuffer + HEADER_SIZE, key, outgoing_header.key_length);
-	
+
 	printf("[i] DEL\n");
 	return do_rpc(outbuffer, final_size, NULL);
 }
@@ -207,7 +207,7 @@ struct element *get(char *key, int keylen) {
 	element_t *e = malloc(sizeof(element_t));
 	printf("[i] GET\n");
 
-	if((do_rpc(outbuffer, final_size, e)) != 1) {
+	if ((do_rpc(outbuffer, final_size, e)) != 1) {
 		free(e);
 		return NULL;
 	};

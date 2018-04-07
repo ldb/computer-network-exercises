@@ -8,7 +8,6 @@
 
 #define COUNT 25
 
-// check if a given array contains the searched value
 int arrayContains(int *rnmbrs, int length, int number) {
 	for (int i = 0; i < length; i++) {
 		if (rnmbrs[i] == number) {
@@ -19,9 +18,8 @@ int arrayContains(int *rnmbrs, int length, int number) {
 	return 0;
 }
 
-// get COUNT random lines from a given file
-// the key is the first string until the first ; occurs
-// the information is stored combined
+// Get COUNT random lines from a given file.
+// The key is the first string until the first ; occurs.
 void getFileInfo(char *file, char **data, char **keys, char **values) {
 	FILE *fp = fopen(file, "r");
 	int lines = 1;
@@ -30,8 +28,6 @@ void getFileInfo(char *file, char **data, char **keys, char **values) {
 	srand(time(NULL));
 	char ch;
 
-	// count the lines in the file
-	// file has to have an empty newline at the end
 	while (!feof(fp)) {
 		ch = fgetc(fp);
 		if (ch == '\n') {
@@ -39,8 +35,6 @@ void getFileInfo(char *file, char **data, char **keys, char **values) {
 		}
 	}
 
-	// create COUNT random and different numbers
-	// in range of the lines
 	int i = 0;
 	while (i < COUNT) {
 		number = rand() % lines;
@@ -50,8 +44,7 @@ void getFileInfo(char *file, char **data, char **keys, char **values) {
 		}
 	}
 
-	// get the data from each line and
-	// store them in keys/values
+	// Get the data from each line and store them in keys/values.
 	rewind(fp);
 	ch = ' ';
 
@@ -74,7 +67,7 @@ void getFileInfo(char *file, char **data, char **keys, char **values) {
 	return;
 }
 
-// Perform COUNT sets, gets and deletes and then try to get these elements again
+// Perform COUNT sets, gets and deletes and then try to get these elements again.
 // (Has to get the Host and Port when communicating with the server)
 void setGetDel(char **keys, char**values, char *dns, char *port) {
 	for (int i = 0; i < COUNT; i++) {
@@ -137,29 +130,29 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	char **data = malloc(sizeof(char*)*COUNT);			// saves all the read data
-	char **keys = malloc(sizeof(char*)*COUNT);			// saves all keys
-	char **values = malloc(sizeof(char*)*COUNT);		// saves all values
+	char **data = malloc(sizeof(char*)*COUNT);
+	char **keys = malloc(sizeof(char*)*COUNT);
+	char **values = malloc(sizeof(char*)*COUNT);
 
 	for (int i = 0; i < COUNT; i++) {
-		data[i] = malloc(sizeof(char) * 1024);		// saves a line from the file
-		keys[i] = malloc(sizeof(char) * 128);			// saves the title of a movie
-		values[i] = malloc(sizeof(char) * 996);		// saves more information about the movie
+		data[i] = malloc(sizeof(char) * 1024);
+		keys[i] = malloc(sizeof(char) * 128);
+		values[i] = malloc(sizeof(char) * 996);
 	}
 
 	getFileInfo(argv[3], data, keys, values);
 
-	init(argv[1], argv[2]);		// Initialize Socket in the rpc_interface
+	init(argv[1], argv[2]);
 
 	setGetDel(keys, values, argv[1], argv[2]);
 
-	for (int i = 0; i < COUNT; i++) {	// Free all the allocated space
+	for (int i = 0; i < COUNT; i++) {
 		free(data[i]);
 		free(keys[i]);
 		free(values[i]);
 	}
 
-	free(data);			// Free all double pointer
+	free(data);
 	free(keys);
 	free(values);
 	return 0;

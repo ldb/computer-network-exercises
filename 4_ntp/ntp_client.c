@@ -125,9 +125,9 @@ int main(int argc, char *argv[]) {
 	printf("--------------------------------------------------------------------------------------------\n");
 
 	struct data_t *data[4];
-	for(int i = 0; i < 4; i++) data[i] = (data_t*)malloc(sizeof(data_t));
+	for (int i = 0; i < 4; i++) data[i] = (data_t*)malloc(sizeof(data_t));
 
-	for(int j = 0; j < 100; j++) {
+	for (int j = 0; j < 100; j++) {
 		int bestServer = 0;
 		double bestDelay = 1;
 		double bestOffset = 0;
@@ -148,9 +148,9 @@ int main(int argc, char *argv[]) {
 
 			double delay = calculateDelay(&seconds);
 			double offset = calculateOffset(&seconds);
-			data[i-1]->offsets[j] = offset;
-			data[i-1]->delays[j] = delay;
-			data[i-1]->r_disps[j] = payload->root_dispersion;
+			data[i - 1]->offsets[j] = offset;
+			data[i - 1]->delays[j] = delay;
+			data[i - 1]->r_disps[j] = payload->root_dispersion;
 
 			if (delay < bestDelay) {
 				bestServer = i;
@@ -165,4 +165,3 @@ int main(int argc, char *argv[]) {
 	}
 	return 0;
 }
-

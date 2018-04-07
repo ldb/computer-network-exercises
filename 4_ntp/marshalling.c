@@ -142,10 +142,10 @@ void printPayload(ntp_payload_t *payload) {
 }
 
 void printBinary(unsigned char *binaryChar, int len) {
-	for (int j = 0; j < len * 4; j++) {	
+	for (int j = 0; j < len * 4; j++) {
 		if ((j > 0) && (j % 4 == 0)) {
 			printf("-----------\n");
-		}		
+		}
 		for (int i = 0; i < 8; i++) {
 			printf("%d", !!((binaryChar[j] << i) & 0x80));
 		}
