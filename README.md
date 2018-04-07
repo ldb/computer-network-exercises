@@ -57,7 +57,13 @@ An implementation of a distributed hashtable using a simplified version of the C
 
 ![](./img/rpc_protocol_extended.png)
 
-### 4_ntp
+### 4_http
+
+Implemetation of a small HTTP-Webserver using [libonion](https://github.com/davidmoreno/onion). Any message sent is saved in the hashtable from previous exercises and assigned an ID under which it can be retrieved. HTTP Commands `GET`, `POST` and `DELETE` are supported.
+
+> Info: The makefile assumes a precompiled static library saved at `lib/64/libonion_static.a` or `lib/32/libonion_static.a`. Those are not included in this repository.
+
+### 5_ntp
 
 _Arguments:_ `hostname [hostname...]`
 
